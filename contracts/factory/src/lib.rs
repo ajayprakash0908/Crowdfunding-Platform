@@ -59,7 +59,7 @@ impl FactoryContract {
         // Use the length of auctions as a salt index for deterministic deployment
         let index = auctions.len();
         let mut salt_arr = [0u8; 32];
-        salt_arr[0..8].copy_from_slice(&index.to_be_bytes());
+        salt_arr[0..4].copy_from_slice(&index.to_be_bytes());
         let salt = BytesN::from_array(&env, &salt_arr);
 
         // Deploy auction contract using deployer
