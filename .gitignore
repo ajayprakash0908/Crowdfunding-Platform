@@ -1,0 +1,5 @@
+/target/
+/stellar.exe
+/stellar-cli.tar.gz
+/.env
+Cargo.lock
