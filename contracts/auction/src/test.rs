@@ -1,36 +1,36 @@
 #![cfg(test)]
 use super::*;
-use soroban_sdk::{testutils::Address as _, Address, Env, String};
+use soroban_sdk::{testutils::Address as _, Address, Env, String, testutils::Ledger};
 
-fn setup_test() -> (Env, Address, Address, Address, Address, AuctionContractClient, token::Client) {
-    let env = Env::default();
+fn setup_test(env: &Env) -> (Address, Address, Address, Address, Address) {
     env.mock_all_auths();
 
-    let seller = Address::generate(&env);
-    let token_admin = Address::generate(&env);
-    let bidder1 = Address::generate(&env);
-    let bidder2 = Address::generate(&env);
+    let seller = Address::generate(env);
+    let token_admin = Address::generate(env);
+    let bidder1 = Address::generate(env);
+    let bidder2 = Address::generate(env);
 
     // Register standard token contract
     let sac = env.register_stellar_asset_contract_v2(token_admin.clone());
     let token_addr = sac.address();
-    let token_client = token::Client::new(&env, &token_addr);
 
     // Register auction contract
     let auction_addr = env.register_contract(None, AuctionContract);
-    let auction_client = AuctionContractClient::new(&env, &auction_addr);
 
     // Mint tokens to bidders
-    let token_admin_client = token::StellarAssetClient::new(&env, &token_addr);
+    let token_admin_client = token::StellarAssetClient::new(env, &token_addr);
     token_admin_client.mint(&bidder1, &10000i128);
     token_admin_client.mint(&bidder2, &20000i128);
 
-    (env, seller, bidder1, bidder2, token_addr, auction_client, token_client)
+    (seller, bidder1, bidder2, token_addr, auction_addr)
 }
 
 #[test]
 fn test_successful_bid_escrow() {
-    let (env, seller, bidder1, _, token_addr, auction_client, token_client) = setup_test();
+    let env = Env::default();
+    let (seller, bidder1, _, token_addr, auction_addr) = setup_test(&env);
+    let auction_client = AuctionContractClient::new(&env, &auction_addr);
+    let token_client = token::Client::new(&env, &token_addr);
 
     let item_name = String::from_str(&env, "Rare NFT");
     let metadata_uri = String::from_str(&env, "ipfs://nft");
@@ -58,7 +58,9 @@ fn test_successful_bid_escrow() {
 #[test]
 #[should_panic(expected = "bid amount below reserve price")]
 fn test_bid_below_reserve() {
-    let (env, seller, bidder1, _, token_addr, auction_client, _) = setup_test();
+    let env = Env::default();
+    let (seller, bidder1, _, token_addr, auction_addr) = setup_test(&env);
+    let auction_client = AuctionContractClient::new(&env, &auction_addr);
 
     let item_name = String::from_str(&env, "Rare NFT");
     let metadata_uri = String::from_str(&env, "ipfs://nft");
@@ -75,7 +77,9 @@ fn test_bid_below_reserve() {
 #[test]
 #[should_panic(expected = "auction time expired")]
 fn test_bid_after_deadline() {
-    let (env, seller, bidder1, _, token_addr, auction_client, _) = setup_test();
+    let env = Env::default();
+    let (seller, bidder1, _, token_addr, auction_addr) = setup_test(&env);
+    let auction_client = AuctionContractClient::new(&env, &auction_addr);
 
     let item_name = String::from_str(&env, "Rare NFT");
     let metadata_uri = String::from_str(&env, "ipfs://nft");
@@ -94,7 +98,10 @@ fn test_bid_after_deadline() {
 
 #[test]
 fn test_outbid_refund() {
-    let (env, seller, bidder1, bidder2, token_addr, auction_client, token_client) = setup_test();
+    let env = Env::default();
+    let (seller, bidder1, bidder2, token_addr, auction_addr) = setup_test(&env);
+    let auction_client = AuctionContractClient::new(&env, &auction_addr);
+    let token_client = token::Client::new(&env, &token_addr);
 
     let item_name = String::from_str(&env, "Rare NFT");
     let metadata_uri = String::from_str(&env, "ipfs://nft");
@@ -124,7 +131,9 @@ fn test_outbid_refund() {
 
 #[test]
 fn test_anti_sniping() {
-    let (env, seller, bidder1, bidder2, token_addr, auction_client, _) = setup_test();
+    let env = Env::default();
+    let (seller, bidder1, bidder2, token_addr, auction_addr) = setup_test(&env);
+    let auction_client = AuctionContractClient::new(&env, &auction_addr);
 
     let item_name = String::from_str(&env, "Rare NFT");
     let metadata_uri = String::from_str(&env, "ipfs://nft");
@@ -149,7 +158,10 @@ fn test_anti_sniping() {
 
 #[test]
 fn test_end_auction_payout() {
-    let (env, seller, bidder1, _, token_addr, auction_client, token_client) = setup_test();
+    let env = Env::default();
+    let (seller, bidder1, _, token_addr, auction_addr) = setup_test(&env);
+    let auction_client = AuctionContractClient::new(&env, &auction_addr);
+    let token_client = token::Client::new(&env, &token_addr);
 
     let item_name = String::from_str(&env, "Rare NFT");
     let metadata_uri = String::from_str(&env, "ipfs://nft");
