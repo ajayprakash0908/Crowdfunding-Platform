@@ -7,7 +7,8 @@ import {
   Contract, 
   Transaction,
   TimeoutInfinite,
-  Account
+  Account,
+  Address
 } from 'stellar-sdk';
 import { StellarWalletsKit, WalletNetwork, FreighterModule, xBullModule } from '@creit.tech/stellar-wallets-kit';
 
@@ -169,8 +170,8 @@ export async function createCampaignTx(
   const contract = new Contract(FACTORY_ADDRESS);
   const op = contract.call(
     'create_campaign',
-    nativeToScVal(sourceAddress, { type: 'address' }),
-    nativeToScVal(TOKEN_ADDRESS, { type: 'address' }),
+    nativeToScVal(Address.fromString(sourceAddress), { type: 'address' }),
+    nativeToScVal(Address.fromString(TOKEN_ADDRESS), { type: 'address' }),
     nativeToScVal(BigInt(goal), { type: 'i128' }),
     nativeToScVal(BigInt(durationSecs), { type: 'u64' }),
     nativeToScVal(metadataUri, { type: 'string' })
@@ -189,7 +190,7 @@ export async function contributeTx(
   const contract = new Contract(campaignAddress);
   const op = contract.call(
     'contribute',
-    nativeToScVal(sourceAddress, { type: 'address' }),
+    nativeToScVal(Address.fromString(sourceAddress), { type: 'address' }),
     nativeToScVal(BigInt(amount), { type: 'i128' })
   );
 
@@ -205,7 +206,7 @@ export async function withdrawTx(
   const contract = new Contract(campaignAddress);
   const op = contract.call(
     'withdraw',
-    nativeToScVal(sourceAddress, { type: 'address' })
+    nativeToScVal(Address.fromString(sourceAddress), { type: 'address' })
   );
 
   return submitTransaction(sourceAddress, op, onStatusChange);
@@ -220,7 +221,7 @@ export async function refundTx(
   const contract = new Contract(campaignAddress);
   const op = contract.call(
     'refund',
-    nativeToScVal(sourceAddress, { type: 'address' })
+    nativeToScVal(Address.fromString(sourceAddress), { type: 'address' })
   );
 
   return submitTransaction(sourceAddress, op, onStatusChange);
@@ -319,7 +320,7 @@ export async function getTokenBalance(tokenAddress: string, userAddress: string)
         networkPassphrase: NETWORK_PASSPHRASE
       }
     )
-      .addOperation(contract.call('balance', nativeToScVal(userAddress, { type: 'address' })))
+      .addOperation(contract.call('balance', nativeToScVal(Address.fromString(userAddress), { type: 'address' })))
       .setTimeout(TimeoutInfinite)
       .build();
 
@@ -345,7 +346,7 @@ export async function mintTokensTx(
   const contract = new Contract(TOKEN_ADDRESS);
   const op = contract.call(
     'mint',
-    nativeToScVal(sourceAddress, { type: 'address' }),
+    nativeToScVal(Address.fromString(sourceAddress), { type: 'address' }),
     nativeToScVal(BigInt(amount), { type: 'i128' })
   );
 
