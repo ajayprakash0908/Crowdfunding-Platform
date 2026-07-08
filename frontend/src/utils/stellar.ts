@@ -12,13 +12,19 @@ import {
 } from 'stellar-sdk';
 import { StellarWalletsKit, WalletNetwork, FreighterModule, xBullModule } from '@creit.tech/stellar-wallets-kit';
 
+// Helper to clean environment variables (removing Carriage Returns \r from Windows files)
+const cleanEnv = (val: string | undefined): string => {
+  if (!val) return '';
+  return val.trim().replace(/\r/g, '');
+};
+
 // Network configuration
-export const RPC_URL = import.meta.env.VITE_STELLAR_RPC_URL || 'https://soroban-testnet.stellar.org';
-export const NETWORK_PASSPHRASE = import.meta.env.VITE_STELLAR_NETWORK_PASSPHRASE || 'Test Stellar Network ; September 2015';
+export const RPC_URL = cleanEnv(import.meta.env.VITE_STELLAR_RPC_URL) || 'https://soroban-testnet.stellar.org';
+export const NETWORK_PASSPHRASE = cleanEnv(import.meta.env.VITE_STELLAR_NETWORK_PASSPHRASE) || 'Test Stellar Network ; September 2015';
 
 // Contract addresses
-export const FACTORY_ADDRESS = import.meta.env.VITE_FACTORY_CONTRACT_ADDRESS || 'CB7SNUNVEH562AGTFPV4O34ITUOO7FRZIJYRCYI3OEHSVY5WFZ4GT7FR';
-let rawTokenAddr = import.meta.env.VITE_TOKEN_CONTRACT_ADDRESS || 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
+export const FACTORY_ADDRESS = cleanEnv(import.meta.env.VITE_FACTORY_CONTRACT_ADDRESS) || 'CB7SNUNVEH562AGTFPV4O34ITUOO7FRZIJYRCYI3OEHSVY5WFZ4GT7FR';
+let rawTokenAddr = cleanEnv(import.meta.env.VITE_TOKEN_CONTRACT_ADDRESS) || 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
 if (rawTokenAddr === 'CDLZFC3SYJYDZT7K67VZ75HPJFCBQ2BBVGTICN2V45PESTCTFBX6JGSZ') {
   rawTokenAddr = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
 }
@@ -127,7 +133,6 @@ export async function submitTransaction(
     onStatusChange('awaiting signature');
     
     const signedResult = await kit.signTransaction(transaction.toXDR(), {
-      network: WalletNetwork.TESTNET,
       networkPassphrase: NETWORK_PASSPHRASE,
       address: sourceAddress
     });
