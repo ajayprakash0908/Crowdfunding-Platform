@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  createAuctionTx, 
-  placeBidTx, 
-  endAuctionTx, 
-  listAuctions, 
-  getAuctionStatus, 
+  createCampaignTx, 
+  contributeTx, 
+  withdrawTx, 
+  refundTx, 
+  listCampaigns, 
+  getCampaignStatus, 
   getTokenBalance, 
   mintTokensTx,
+  calculateProgress,
+  validateCampaignInputs,
   FACTORY_ADDRESS,
   TOKEN_ADDRESS,
-  NETWORK_PASSPHRASE,
   getContractEvents,
   kit,
-  type AuctionStatus,
+  type CampaignStatus,
   type DecodedEvent
 } from './utils/stellar';
 
-// Mock/Sandbox Mode Constants
-const MOCK_SELLER = 'GDDS2SELLER...MOCK';
-const MOCK_BIDDER_1 = 'GD352BIDDER1...MOCK';
-const MOCK_BIDDER_2 = 'GD532BIDDER2...MOCK';
+// Mock Constants for Sandbox Simulation
+const MOCK_CREATOR = 'GDDS2CREATOR...MOCK';
 
 export default function App() {
   // Wallet state
@@ -29,20 +29,19 @@ export default function App() {
   const [tokenBalance, setTokenBalance] = useState<string>('0');
   const [isSandbox, setIsSandbox] = useState<boolean>(false);
   
-  // Contracts state
-  const factoryAddress = FACTORY_ADDRESS || 'CBDK...';
-  const [auctions, setAuctions] = useState<AuctionStatus[]>([]);
-  const [loadingAuctions, setLoadingAuctions] = useState<boolean>(false);
+  // Campaigns list state
+  const factoryAddress = FACTORY_ADDRESS || 'CB7SNUNVEH562AGTFPV4O34ITUOO7FRZIJYRCYI3OEHSVY5WFZ4GT7FR';
+  const [campaigns, setCampaigns] = useState<CampaignStatus[]>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState<boolean>(false);
   const [recentEvents, setRecentEvents] = useState<DecodedEvent[]>([]);
   
-  // Create Auction Form state
-  const [itemName, setItemName] = useState<string>('');
-  const [metadataUri, setMetadataUri] = useState<string>('');
-  const [reservePrice, setReservePrice] = useState<string>('100');
+  // Create Campaign Form state
+  const [goal, setGoal] = useState<string>('1000');
   const [durationSecs, setDurationSecs] = useState<string>('3600');
+  const [metadataUri, setMetadataUri] = useState<string>('ipfs://campaign-init-meta');
   
-  // Bidding Form state
-  const [bidAmounts, setBidAmounts] = useState<{ [contractAddr: string]: string }>({});
+  // Contribution Form state
+  const [contributionAmounts, setContributionAmounts] = useState<{ [contractAddr: string]: string }>({});
   
   // Transaction Progress state
   const [txStatus, setTxStatus] = useState<string>('idle'); // idle, building, awaiting signature, submitting, confirming, success, error
@@ -51,13 +50,12 @@ export default function App() {
   
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed'>('all');
-  const [sortBy, setSortBy] = useState<'endTime' | 'highestBid'>('endTime');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'success' | 'failed'>('all');
 
-  // Trigger countdown ticks
+  // Trigger ticker updates
   const [_tick, setTick] = useState<number>(0);
 
-  // Poll intervals
+  // Poll ticks for countdowns
   useEffect(() => {
     const timer = setInterval(() => {
       setTick((t) => t + 1);
@@ -65,12 +63,12 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Initialize and load initial auctions
+  // Initialize and load campaigns
   useEffect(() => {
     if (isSandbox) {
-      loadSandboxAuctions();
+      loadSandboxCampaigns();
     } else {
-      loadRealAuctions();
+      loadRealCampaigns();
     }
   }, [isSandbox, factoryAddress]);
 
@@ -88,76 +86,72 @@ export default function App() {
     return () => clearInterval(pollInterval);
   }, [walletConnected, userAddress, isSandbox]);
 
-  // Load Real Auctions from Soroban Factory
-  const loadRealAuctions = async () => {
-    if (!factoryAddress || factoryAddress.startsWith('CBDK')) return;
-    setLoadingAuctions(true);
+  // Load Real Campaigns from Soroban
+  const loadRealCampaigns = async () => {
+    if (!factoryAddress || factoryAddress.startsWith('CB7S') === false) return;
+    setLoadingCampaigns(true);
     try {
-      const addresses = await listAuctions();
-      const loaded: AuctionStatus[] = [];
+      const addresses = await listCampaigns();
+      const loaded: CampaignStatus[] = [];
       for (const addr of addresses) {
-        const status = await getAuctionStatus(addr);
+        const status = await getCampaignStatus(addr);
         if (status) {
           loaded.push(status);
         }
       }
-      setAuctions(loaded);
+      setCampaigns(loaded);
     } catch (err) {
-      console.error('Failed to load real auctions:', err);
+      console.error('Failed to load campaigns:', err);
     } finally {
-      setLoadingAuctions(false);
+      setLoadingCampaigns(false);
     }
   };
 
-  // Load Initial Mock Auctions for Sandbox Mode
-  const loadSandboxAuctions = () => {
+  // Load Initial Mock Campaigns for Sandbox
+  const loadSandboxCampaigns = () => {
     const now = BigInt(Math.floor(Date.now() / 1000));
-    const mockList: AuctionStatus[] = [
+    const mockList: CampaignStatus[] = [
       {
-        contractAddress: 'CAUC_MOCK_GOLDEN_SWORD',
-        seller: MOCK_SELLER,
+        contractAddress: 'CCAMP_MOCK_SAVE_THE_OCEAN',
+        creator: MOCK_CREATOR,
         token: TOKEN_ADDRESS,
-        itemName: 'Mythic Golden Sword',
-        itemMetadataUri: 'https://images.unsplash.com/photo-1595152772835-219674b2a8a6?w=200&auto=format&fit=crop&q=60',
-        reservePrice: 250n,
-        endTime: now + 120n, // 2 minutes remaining
-        highestBid: 250n,
-        highestBidder: MOCK_BIDDER_1,
-        ended: false
+        goal: 5000n,
+        deadline: now + 300n, // 5 minutes remaining
+        raised: 3200n,
+        goalMet: false,
+        ended: false,
+        metadataUri: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=200&auto=format&fit=crop&q=60'
       },
       {
-        contractAddress: 'CAUC_MOCK_CYBER_CROWN',
-        seller: MOCK_SELLER,
+        contractAddress: 'CCAMP_MOCK_SOLAR_POWER_KITS',
+        creator: MOCK_CREATOR,
         token: TOKEN_ADDRESS,
-        itemName: 'Cyber Neon Crown',
-        itemMetadataUri: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=60',
-        reservePrice: 500n,
-        endTime: now + 3600n, // 1 hour remaining
-        highestBid: 0n,
-        highestBidder: null,
-        ended: false
+        goal: 10000n,
+        deadline: now + 7200n, // 2 hours remaining
+        raised: 12000n,
+        goalMet: true,
+        ended: false,
+        metadataUri: 'https://images.unsplash.com/photo-1509391366360-2e959784a276?w=200&auto=format&fit=crop&q=60'
       },
       {
-        contractAddress: 'CAUC_MOCK_PIXEL_SHIELD',
-        seller: MOCK_SELLER,
+        contractAddress: 'CCAMP_MOCK_OLD_LIBRARY_BOOKS',
+        creator: MOCK_CREATOR,
         token: TOKEN_ADDRESS,
-        itemName: 'Vintage Pixel Shield',
-        itemMetadataUri: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=200&auto=format&fit=crop&q=60',
-        reservePrice: 100n,
-        endTime: now - 30n, // Expired
-        highestBid: 450n,
-        highestBidder: MOCK_BIDDER_2,
-        ended: false
+        goal: 2500n,
+        deadline: now - 30n, // Expired
+        raised: 1500n,
+        goalMet: false,
+        ended: false,
+        metadataUri: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=200&auto=format&fit=crop&q=60'
       }
     ];
-    setAuctions(mockList);
+    setCampaigns(mockList);
   };
 
-  // Refresh native and token balances
+  // Refresh balances
   const refreshBalances = async () => {
     if (!userAddress) return;
     if (isSandbox) {
-      // Keep static mock balance or read from localStorage
       const cached = localStorage.getItem(`sandbox_bal_${userAddress}`);
       setTokenBalance(cached || '10000');
       setNativeBalance('150');
@@ -165,15 +159,14 @@ export default function App() {
       try {
         const bal = await getTokenBalance(TOKEN_ADDRESS, userAddress);
         setTokenBalance(bal.toString());
-        // Simple mock for Native XLM to avoid heavy RPC calls
-        setNativeBalance('85.4');
+        setNativeBalance('84.2'); // Standard static placeholder for Native XLM fees
       } catch (err) {
         console.error('Balance check failed:', err);
       }
     }
   };
 
-  // Poll Real Soroban Events
+  // Poll Real Events
   const pollRealEvents = async () => {
     if (!factoryAddress) return;
     try {
@@ -197,10 +190,10 @@ export default function App() {
       
       const mockEvent: DecodedEvent = {
         id: 'evt_sandbox_init',
-        type: 'sandbox_connect',
+        type: 'campaign_created',
         contractId: 'SANDBOX',
         ledger: '1',
-        topics: ['Wallet Connected', randAddr],
+        topics: ['Sandbox Connected', randAddr],
         value: 'Sandbox Mode Active',
         timestamp: Date.now()
       };
@@ -214,7 +207,6 @@ export default function App() {
         setWalletConnected(true);
         setTxStatus('idle');
         
-        // Load initial real events
         const factoryEvents = await getContractEvents(factoryAddress);
         setRecentEvents(factoryEvents);
       } catch (err: any) {
@@ -232,7 +224,7 @@ export default function App() {
     setTokenBalance('0');
   };
 
-  // Mint Tokens (Testnet Faucet / Sandbox Mint)
+  // Mint Tokens (Testnet Faucet)
   const handleMintTokens = async () => {
     if (isSandbox) {
       setTxStatus('building');
@@ -244,731 +236,702 @@ export default function App() {
         
         const mockEvt: DecodedEvent = {
           id: `evt_mint_${Date.now()}`,
-          type: 'new_bid',
+          type: 'contribution',
           contractId: TOKEN_ADDRESS,
           ledger: '99',
           topics: ['token_mint', userAddress],
-          value: 500,
+          value: '500 Tokens Faucet Minted',
           timestamp: Date.now()
         };
         setRecentEvents((prev) => [mockEvt, ...prev]);
-        setTimeout(() => setTxStatus('idle'), 2000);
       }, 1000);
     } else {
       try {
-        await mintTokensTx(userAddress, '1000', (status, hash, err) => {
+        setTxError(undefined);
+        await mintTokensTx(userAddress, '500', (status, hash, err) => {
           setTxStatus(status);
           setTxHash(hash);
-          setTxError(err);
+          if (err) setTxError(err);
         });
-        refreshBalances();
+        await refreshBalances();
       } catch (err) {
-        console.error('Mint failed', err);
+        console.error('Minting failed:', err);
       }
     }
   };
 
-  // Create Auction Submit
-  const handleCreateAuction = async (e: React.FormEvent) => {
+  // Create Campaign Submit
+  const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!itemName || !reservePrice || !durationSecs) return;
     
+    // Form Input Validation
+    const validation = validateCampaignInputs(goal, durationSecs, metadataUri);
+    if (!validation.valid) {
+      setTxStatus('error');
+      setTxError(validation.error);
+      return;
+    }
+
     if (isSandbox) {
       setTxStatus('building');
       setTimeout(() => {
-        setTxStatus('awaiting signature');
-        setTimeout(() => {
-          setTxStatus('submitting');
-          setTimeout(() => {
-            const now = BigInt(Math.floor(Date.now() / 1000));
-            const newAuctionAddr = `CAUC_MOCK_${itemName.replace(/\s+/g, '_').toUpperCase()}_${Date.now()}`;
-            const newAuction: AuctionStatus = {
-              contractAddress: newAuctionAddr,
-              seller: userAddress,
-              token: TOKEN_ADDRESS,
-              itemName,
-              itemMetadataUri: metadataUri || 'https://images.unsplash.com/photo-1563089145-599997674d42?w=200&auto=format&fit=crop&q=60',
-              reservePrice: BigInt(reservePrice),
-              endTime: now + BigInt(durationSecs),
-              highestBid: 0n,
-              highestBidder: null,
-              ended: false
-            };
-            setAuctions([newAuction, ...auctions]);
-            
-            const mockEvt: DecodedEvent = {
-              id: `evt_create_${Date.now()}`,
-              type: 'auction_created',
-              contractId: factoryAddress,
-              ledger: '100',
-              topics: ['auction_created', userAddress, newAuctionAddr],
-              value: [itemName, reservePrice, durationSecs],
-              timestamp: Date.now()
-            };
-            setRecentEvents((prev) => [mockEvt, ...prev]);
-
-            setTxStatus('success');
-            setItemName('');
-            setMetadataUri('');
-            setTimeout(() => setTxStatus('idle'), 2000);
-          }, 800);
-        }, 800);
-      }, 500);
+        setTxStatus('success');
+        const now = BigInt(Math.floor(Date.now() / 1000));
+        const newCampaign: CampaignStatus = {
+          contractAddress: `CCAMP_MOCK_${Date.now()}`,
+          creator: userAddress,
+          token: TOKEN_ADDRESS,
+          goal: BigInt(goal),
+          deadline: now + BigInt(durationSecs),
+          raised: 0n,
+          goalMet: false,
+          ended: false,
+          metadataUri
+        };
+        setCampaigns((prev) => [newCampaign, ...prev]);
+        
+        const mockEvt: DecodedEvent = {
+          id: `evt_camp_${Date.now()}`,
+          type: 'campaign_created',
+          contractId: newCampaign.contractAddress,
+          ledger: '100',
+          topics: ['campaign_created', userAddress],
+          value: `Goal: ${goal} Tokens`,
+          timestamp: Date.now()
+        };
+        setRecentEvents((prev) => [mockEvt, ...prev]);
+      }, 1200);
     } else {
       try {
-        await createAuctionTx(
+        setTxError(undefined);
+        await createCampaignTx(
           userAddress,
-          itemName,
-          metadataUri || 'ipfs://placeholder',
-          reservePrice,
-          parseInt(durationSecs),
+          goal,
+          Number(durationSecs),
+          metadataUri,
           (status, hash, err) => {
             setTxStatus(status);
             setTxHash(hash);
-            setTxError(err);
+            if (err) setTxError(err);
           }
         );
-        setItemName('');
-        setMetadataUri('');
-        loadRealAuctions();
+        await loadRealCampaigns();
       } catch (err) {
-        console.error('Create auction failed', err);
+        console.error('Create campaign transaction failed:', err);
       }
     }
   };
 
-  // Place Bid Submit
-  const handlePlaceBid = async (auctionAddress: string) => {
-    const amount = bidAmounts[auctionAddress];
-    if (!amount) return;
-    const bidValue = BigInt(amount);
-
-    const targetAuction = auctions.find((a) => a.contractAddress === auctionAddress);
-    if (!targetAuction) return;
-
-    if (bidValue <= targetAuction.highestBid) {
-      alert(`Bid must be higher than current highest bid (${targetAuction.highestBid} tokens)`);
+  // Contribute to Campaign
+  const handleContribute = async (campaignAddress: string) => {
+    const amount = contributionAmounts[campaignAddress] || '';
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      setTxStatus('error');
+      setTxError('Please enter a positive contribution amount');
       return;
     }
-    if (bidValue < targetAuction.reservePrice) {
-      alert(`Bid must be at least the reserve price (${targetAuction.reservePrice} tokens)`);
+
+    // Check balance
+    if (BigInt(amount) > BigInt(tokenBalance)) {
+      setTxStatus('error');
+      setTxError('Insufficient balance to contribute');
       return;
     }
 
     if (isSandbox) {
       setTxStatus('building');
       setTimeout(() => {
-        setTxStatus('awaiting signature');
-        setTimeout(() => {
-          setTxStatus('submitting');
-          setTimeout(() => {
-            // Apply outbid refund simulation or balance checks
-            const currentBal = BigInt(tokenBalance);
-            if (currentBal < bidValue) {
-              setTxStatus('error');
-              setTxError('Insufficient wrapped token balance');
-              return;
-            }
-
-            // Update local state
-            setAuctions(
-              auctions.map((a) => {
-                if (a.contractAddress === auctionAddress) {
-                  // If anti-sniping threshold (60s) is violated, extend auction by 60s
-                  const now = BigInt(Math.floor(Date.now() / 1000));
-                  const timeLeft = a.endTime - now;
-                  let newEndTime = a.endTime;
-                  if (timeLeft > 0n && timeLeft <= 60n) {
-                    newEndTime = now + 60n;
-                  }
-
-                  return {
-                    ...a,
-                    highestBid: bidValue,
-                    highestBidder: userAddress,
-                    endTime: newEndTime
-                  };
-                }
-                return a;
-              })
-            );
-
-            // Deduct balance
-            const newBal = (currentBal - bidValue).toString();
-            setTokenBalance(newBal);
-            localStorage.setItem(`sandbox_bal_${userAddress}`, newBal);
-
-            const mockEvt: DecodedEvent = {
-              id: `evt_bid_${Date.now()}`,
-              type: 'new_bid',
-              contractId: auctionAddress,
-              ledger: '101',
-              topics: ['new_bid', userAddress, bidValue.toString()],
-              value: targetAuction.endTime,
-              timestamp: Date.now()
+        setTxStatus('success');
+        
+        // Update campaigns list
+        const updated = campaigns.map((c) => {
+          if (c.contractAddress === campaignAddress) {
+            const raised = c.raised + BigInt(amount);
+            return {
+              ...c,
+              raised,
+              goalMet: raised >= c.goal
             };
-            setRecentEvents((prev) => [mockEvt, ...prev]);
+          }
+          return c;
+        });
+        setCampaigns(updated);
 
-            setTxStatus('success');
-            setBidAmounts({ ...bidAmounts, [auctionAddress]: '' });
-            setTimeout(() => setTxStatus('idle'), 2000);
-          }, 800);
-        }, 800);
-      }, 500);
+        // Deduct balance
+        const newBal = (BigInt(tokenBalance) - BigInt(amount)).toString();
+        setTokenBalance(newBal);
+        localStorage.setItem(`sandbox_bal_${userAddress}`, newBal);
+
+        // Record donor contribution record locally
+        const cachedDonorContrib = localStorage.getItem(`sandbox_contrib_${userAddress}_${campaignAddress}`) || '0';
+        const newDonorContrib = (BigInt(cachedDonorContrib) + BigInt(amount)).toString();
+        localStorage.setItem(`sandbox_contrib_${userAddress}_${campaignAddress}`, newDonorContrib);
+
+        // Event log
+        const mockEvt: DecodedEvent = {
+          id: `evt_contrib_${Date.now()}`,
+          type: 'contribution',
+          contractId: campaignAddress,
+          ledger: '101',
+          topics: ['contribution', userAddress],
+          value: `Contributed: ${amount} Tokens`,
+          timestamp: Date.now()
+        };
+        setRecentEvents((prev) => [mockEvt, ...prev]);
+        setContributionAmounts({ ...contributionAmounts, [campaignAddress]: '' });
+      }, 1200);
     } else {
       try {
-        await placeBidTx(userAddress, auctionAddress, amount, (status, hash, err) => {
-          setTxStatus(status);
-          setTxHash(hash);
-          setTxError(err);
-        });
-        setBidAmounts({ ...bidAmounts, [auctionAddress]: '' });
-        loadRealAuctions();
-        refreshBalances();
+        setTxError(undefined);
+        await contributeTx(
+          userAddress,
+          campaignAddress,
+          amount,
+          (status, hash, err) => {
+            setTxStatus(status);
+            setTxHash(hash);
+            if (err) setTxError(err);
+          }
+        );
+        setContributionAmounts({ ...contributionAmounts, [campaignAddress]: '' });
+        await refreshBalances();
+        await loadRealCampaigns();
       } catch (err) {
-        console.error('Bid failed', err);
+        console.error('Contribution failed:', err);
       }
     }
   };
 
-  // End Auction Action
-  const handleEndAuction = async (auctionAddress: string) => {
+  // Withdraw Campaign Funds (Creator only)
+  const handleWithdraw = async (campaign: CampaignStatus) => {
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    
+    // Check Campaign Target conditions
+    if (now < campaign.deadline) {
+      setTxStatus('error');
+      setTxError('Cannot withdraw before the deadline has expired');
+      return;
+    }
+    if (campaign.raised < campaign.goal) {
+      setTxStatus('error');
+      setTxError('Goal was not met. Campign cannot be withdrawn');
+      return;
+    }
+
     if (isSandbox) {
       setTxStatus('building');
       setTimeout(() => {
-        setTxStatus('submitting');
-        setTimeout(() => {
-          setAuctions(
-            auctions.map((a) => {
-              if (a.contractAddress === auctionAddress) {
-                return { ...a, ended: true };
-              }
-              return a;
-            })
-          );
-          
-          const target = auctions.find((a) => a.contractAddress === auctionAddress);
-          const mockEvt: DecodedEvent = {
-            id: `evt_end_${Date.now()}`,
-            type: 'auction_ended',
-            contractId: auctionAddress,
-            ledger: '102',
-            topics: ['auction_ended', target?.seller || '', target?.highestBidder || 'None'],
-            value: target?.highestBid.toString() || '0',
-            timestamp: Date.now()
-          };
-          setRecentEvents((prev) => [mockEvt, ...prev]);
+        setTxStatus('success');
+        
+        // Update campaigns list
+        const updated = campaigns.map((c) => {
+          if (c.contractAddress === campaign.contractAddress) {
+            return { ...c, ended: true };
+          }
+          return c;
+        });
+        setCampaigns(updated);
 
-          setTxStatus('success');
-          setTimeout(() => setTxStatus('idle'), 2000);
-        }, 800);
-      }, 500);
+        // Increase creator balance
+        if (campaign.creator === userAddress) {
+          const newBal = (BigInt(tokenBalance) + campaign.raised).toString();
+          setTokenBalance(newBal);
+          localStorage.setItem(`sandbox_bal_${userAddress}`, newBal);
+        }
+
+        const mockEvt: DecodedEvent = {
+          id: `evt_withdraw_${Date.now()}`,
+          type: 'withdrawn',
+          contractId: campaign.contractAddress,
+          ledger: '102',
+          topics: ['withdrawn', campaign.creator],
+          value: `Withdrawn: ${campaign.raised} Tokens`,
+          timestamp: Date.now()
+        };
+        setRecentEvents((prev) => [mockEvt, ...prev]);
+      }, 1500);
     } else {
       try {
-        await endAuctionTx(userAddress, auctionAddress, (status, hash, err) => {
-          setTxStatus(status);
-          setTxHash(hash);
-          setTxError(err);
-        });
-        loadRealAuctions();
-        refreshBalances();
+        setTxError(undefined);
+        await withdrawTx(
+          userAddress,
+          campaign.contractAddress,
+          (status, hash, err) => {
+            setTxStatus(status);
+            setTxHash(hash);
+            if (err) setTxError(err);
+          }
+        );
+        await refreshBalances();
+        await loadRealCampaigns();
       } catch (err) {
-        console.error('End auction failed', err);
+        console.error('Withdrawal failed:', err);
       }
     }
   };
 
-  // Format countdown string
-  const formatTimeLeft = (endTime: bigint) => {
+  // Request Donor Refund (Donor only)
+  const handleRefund = async (campaignAddress: string) => {
+    const campaign = campaigns.find(c => c.contractAddress === campaignAddress);
+    if (!campaign) return;
+    
     const now = BigInt(Math.floor(Date.now() / 1000));
-    const diff = endTime - now;
-    if (diff <= 0n) return 'Expired';
-    
-    const hrs = diff / 3600n;
-    const mins = (diff % 3600n) / 60n;
-    const secs = diff % 60n;
-    
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    if (now < campaign.deadline) {
+      setTxStatus('error');
+      setTxError('Cannot claim refund before campaign deadline has passed');
+      return;
+    }
+    if (campaign.raised >= campaign.goal) {
+      setTxStatus('error');
+      setTxError('Goal was met. Refunds are disabled');
+      return;
+    }
+
+    if (isSandbox) {
+      setTxStatus('building');
+      const contribCached = localStorage.getItem(`sandbox_contrib_${userAddress}_${campaignAddress}`) || '0';
+      const contribVal = BigInt(contribCached);
+      if (contribVal <= 0n) {
+        setTxStatus('error');
+        setTxError('No contribution balance found to refund');
+        return;
+      }
+
+      setTimeout(() => {
+        setTxStatus('success');
+        
+        // Update campaigns list
+        const updated = campaigns.map((c) => {
+          if (c.contractAddress === campaignAddress) {
+            return {
+              ...c,
+              raised: c.raised - contribVal
+            };
+          }
+          return c;
+        });
+        setCampaigns(updated);
+
+        // Return balance
+        const newBal = (BigInt(tokenBalance) + contribVal).toString();
+        setTokenBalance(newBal);
+        localStorage.setItem(`sandbox_bal_${userAddress}`, newBal);
+        localStorage.setItem(`sandbox_contrib_${userAddress}_${campaignAddress}`, '0');
+
+        const mockEvt: DecodedEvent = {
+          id: `evt_refund_${Date.now()}`,
+          type: 'refunded',
+          contractId: campaignAddress,
+          ledger: '103',
+          topics: ['refunded', userAddress],
+          value: `Refunded: ${contribVal} Tokens`,
+          timestamp: Date.now()
+        };
+        setRecentEvents((prev) => [mockEvt, ...prev]);
+      }, 1500);
+    } else {
+      try {
+        setTxError(undefined);
+        await refundTx(
+          userAddress,
+          campaignAddress,
+          (status, hash, err) => {
+            setTxStatus(status);
+            setTxHash(hash);
+            if (err) setTxError(err);
+          }
+        );
+        await refreshBalances();
+        await loadRealCampaigns();
+      } catch (err) {
+        console.error('Refund transaction failed:', err);
+      }
+    }
   };
 
-  // Filtered & Sorted Auctions
-  const filteredAuctions = auctions
-    .filter((a) => {
-      const matchSearch = a.itemName.toLowerCase().includes(searchQuery.toLowerCase());
-      const now = BigInt(Math.floor(Date.now() / 1000));
-      const expired = a.endTime <= now || a.ended;
-      if (filterStatus === 'active') return matchSearch && !expired;
-      if (filterStatus === 'completed') return matchSearch && expired;
-      return matchSearch;
-    })
-    .sort((a, b) => {
-      if (sortBy === 'endTime') {
-        return Number(a.endTime - b.endTime);
-      } else {
-        return Number(b.highestBid - a.highestBid);
-      }
-    });
+  // Helper: Format address
+  const formatAddress = (addr: string) => {
+    if (!addr) return '';
+    return addr.substring(0, 6) + '...' + addr.substring(addr.length - 4);
+  };
+
+  // Helper: Format countdown timer
+  const renderTimeLeft = (deadline: bigint) => {
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const diff = deadline - now;
+    if (diff <= 0n) {
+      return <span className="text-red-500 font-semibold font-mono">Expired</span>;
+    }
+    const secs = Number(diff % 60n);
+    const mins = Number((diff / 60n) % 60n);
+    const hours = Number(diff / 3600n);
+    return (
+      <span className="text-emerald-400 font-semibold font-mono">
+        {hours}h {mins}m {secs}s
+      </span>
+    );
+  };
+
+  // Filtering list
+  const filteredCampaigns = campaigns.filter((c) => {
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    const isExpired = now >= c.deadline;
+    
+    // Search
+    const matchesSearch = c.contractAddress.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          c.metadataUri.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+
+    // Filters
+    if (filterStatus === 'active') return !isExpired && !c.ended;
+    if (filterStatus === 'success') return c.raised >= c.goal;
+    if (filterStatus === 'failed') return isExpired && c.raised < c.goal;
+    return true;
+  });
 
   return (
-    <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 16px' }}>
-      {/* HEADER */}
-      <header className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="live-dot"></div>
-          <div>
-            <h1 className="glow-text-rainbow" style={{ fontSize: '24px', margin: 0 }}>Stellar Soroban Auctions</h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '12px', margin: '2px 0 0 0' }}>
-              Connected to <strong style={{ color: '#818cf8' }}>Testnet</strong>
-            </p>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased">
+      {/* Header Navbar */}
+      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-30 px-4 py-3">
+        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl font-black bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent tracking-wider">
+              FUNDSTREAMPACK
+            </span>
+            <span className="px-2 py-0.5 text-xs font-bold uppercase rounded bg-teal-500/20 text-teal-400 border border-teal-500/30">
+              Soroban L3
+            </span>
           </div>
-        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-          {walletConnected && (
-            <div style={{ display: 'flex', gap: '16px', background: 'rgba(255,255,255,0.03)', padding: '8px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>XLM Balance</span>
-                <strong style={{ fontSize: '14px', color: '#10b981' }}>{nativeBalance} XLM</strong>
+          <div className="flex items-center gap-3">
+            {walletConnected ? (
+              <div className="flex items-center gap-3">
+                {/* Balance labels */}
+                <div className="hidden sm:flex flex-col text-right">
+                  <span className="text-xs text-slate-400">Balance</span>
+                  <span className="text-sm font-bold text-teal-400 font-mono">
+                    {tokenBalance} TOK | {nativeBalance} XLM
+                  </span>
+                </div>
+                <div className="bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-sm font-medium flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${isSandbox ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`}></span>
+                  <span className="font-mono">{formatAddress(userAddress)}</span>
+                </div>
+                <button
+                  onClick={handleMintTokens}
+                  className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 active:scale-95 transition-all"
+                >
+                  Faucet Fnd
+                </button>
+                <button
+                  onClick={handleDisconnect}
+                  className="px-3 py-1.5 text-xs font-bold uppercase rounded-lg bg-red-950/40 hover:bg-red-900/40 text-red-400 border border-red-900/40 transition-all"
+                >
+                  Disconnect
+                </button>
               </div>
-              <div style={{ borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '16px' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Wrapped Token</span>
-                <strong style={{ fontSize: '14px', color: 'var(--secondary)' }}>{tokenBalance} BID</strong>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleConnectWallet('freighter')}
+                  className="px-4 py-2 text-sm font-bold uppercase rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 active:scale-95 transition-all shadow-lg shadow-teal-500/10"
+                >
+                  Freighter Wallet
+                </button>
+                <button
+                  onClick={() => handleConnectWallet('sandbox')}
+                  className="px-4 py-2 text-sm font-bold uppercase rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 active:scale-95 transition-all"
+                >
+                  Sandbox (Mock)
+                </button>
               </div>
-            </div>
-          )}
-
-          {walletConnected ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="glass-card" style={{ padding: '8px 14px', fontSize: '13px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)' }}>
-                {userAddress.slice(0, 6)}...{userAddress.slice(-4)}
-                {isSandbox && <span style={{ marginLeft: '6px', fontSize: '10px', padding: '2px 6px', background: '#3b82f6', borderRadius: '4px' }}>Sandbox</span>}
-              </span>
-              <button className="btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={handleDisconnect}>
-                Disconnect
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button className="btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }} onClick={() => handleConnectWallet('freighter')}>
-                Connect Freighter
-              </button>
-              <button className="btn-secondary" style={{ padding: '8px 16px', fontSize: '13px', borderColor: '#3b82f6' }} onClick={() => handleConnectWallet('sandbox')}>
-                Enter Sandbox
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </header>
 
-      {/* DASHBOARD METRICS */}
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-        <div className="glass-card" style={{ padding: '20px' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Total Auctions Registered</span>
-          <h2 style={{ fontSize: '28px', marginTop: '6px' }}>{auctions.length}</h2>
-        </div>
-        <div className="glass-card" style={{ padding: '20px' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Active Auctions</span>
-          <h2 style={{ fontSize: '28px', marginTop: '6px', color: '#10b981' }}>
-            {auctions.filter((a) => {
-              const now = BigInt(Math.floor(Date.now() / 1000));
-              return a.endTime > now && !a.ended;
-            }).length}
-          </h2>
-        </div>
-        <div className="glass-card" style={{ padding: '20px' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Highest Bid Recorded</span>
-          <h2 style={{ fontSize: '28px', marginTop: '6px', color: 'var(--secondary)' }}>
-            {Math.max(...auctions.map((a) => Number(a.highestBid)), 0)} BID
-          </h2>
-        </div>
-        <div className="glass-card" style={{ padding: '20px' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Network Passphrase</span>
-          <h2 style={{ fontSize: '13px', marginTop: '12px', color: 'var(--text-muted)', wordBreak: 'break-all', fontFamily: 'monospace' }}>
-            {NETWORK_PASSPHRASE}
-          </h2>
-        </div>
-      </section>
-
-      {/* MAIN TWO-COLUMN BODY */}
-      <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '32px', alignItems: 'start' }}>
-        {/* LEFT COLUMN: auctions grid */}
-        <div>
-          {/* SEARCH & FILTERS BAR */}
-          <div className="glass-card" style={{ display: 'flex', gap: '16px', padding: '16px', marginBottom: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <input 
-              type="text" 
-              className="form-input" 
-              placeholder="Search items..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ flex: 2, minWidth: '200px' }}
-            />
-            
-            <select 
-              className="form-input" 
-              value={filterStatus}
-              onChange={(e: any) => setFilterStatus(e.target.value)}
-              style={{ flex: 1, minWidth: '130px' }}
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active Only</option>
-              <option value="completed">Completed Only</option>
-            </select>
-
-            <select 
-              className="form-input" 
-              value={sortBy}
-              onChange={(e: any) => setSortBy(e.target.value)}
-              style={{ flex: 1, minWidth: '130px' }}
-            >
-              <option value="endTime">Sort by Time Remaining</option>
-              <option value="highestBid">Sort by Highest Bid</option>
-            </select>
-          </div>
-
-          {loadingAuctions ? (
-            <div className="glass-card shimmer" style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '16px' }}>
-              <h3>Loading smart contract auctions...</h3>
-            </div>
-          ) : filteredAuctions.length === 0 ? (
-            <div className="glass-card" style={{ padding: '48px', textAlign: 'center', borderRadius: '16px' }}>
-              <h3 style={{ color: 'var(--text-muted)' }}>No auctions match your filters.</h3>
-              <p style={{ marginTop: '8px' }}>Create one on the right sidebar to get started!</p>
-            </div>
-          ) : (
-            <div className="grid-container">
-              {filteredAuctions.map((auc) => {
-                const now = BigInt(Math.floor(Date.now() / 1000));
-                const expired = auc.endTime <= now;
-                const isWinner = auc.highestBidder === userAddress;
-                
-                return (
-                  <div key={auc.contractAddress} className="glass-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ height: '180px', position: 'relative', background: 'linear-gradient(135deg, #1e1b4b 0%, #311042 100%)' }}>
-                      {auc.itemMetadataUri.startsWith('http') ? (
-                        <img 
-                          src={auc.itemMetadataUri} 
-                          alt={auc.itemName} 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                        />
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '48px' }}>
-                          📦
-                        </div>
-                      )}
-                      
-                      {/* Badge status */}
-                      <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '6px' }}>
-                        {isWinner && userAddress && (
-                          <span style={{ 
-                            padding: '4px 10px', 
-                            borderRadius: '8px', 
-                            fontSize: '11px', 
-                            fontWeight: 'bold',
-                            background: '#eab308',
-                            color: 'black'
-                          }}>
-                            {auc.ended ? '🏆 WON' : '🏆 WINNING'}
-                          </span>
-                        )}
-                        <span style={{ 
-                          padding: '4px 10px', 
-                          borderRadius: '8px', 
-                          fontSize: '11px', 
-                          fontWeight: 'bold',
-                          background: auc.ended ? '#3f3f46' : expired ? '#ef4444' : '#10b981',
-                          color: 'white'
-                        }}>
-                          {auc.ended ? 'ENDED' : expired ? 'EXPIRED' : 'LIVE'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div style={{ padding: '20px', flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                      <div>
-                        <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>{auc.itemName}</h3>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '11px', margin: '4px 0', fontFamily: 'monospace' }}>
-                          Contract: {auc.contractAddress.slice(0, 8)}...{auc.contractAddress.slice(-6)}
-                        </p>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '11px', margin: '4px 0', fontFamily: 'monospace' }}>
-                          Seller: {auc.seller.slice(0, 8)}...{auc.seller.slice(-6)}
-                        </p>
-                      </div>
-
-                      <div style={{ margin: '16px 0', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Highest Bid</span>
-                          <span style={{ fontWeight: 'bold', color: 'var(--secondary)' }}>
-                            {auc.highestBid > 0n ? `${auc.highestBid} BID` : 'No bids yet'}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Reserve Price</span>
-                          <span style={{ fontWeight: '500' }}>{auc.reservePrice.toString()} BID</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Time Remaining</span>
-                          <span style={{ fontWeight: 'bold', color: expired ? '#ef4444' : '#6366f1', fontFamily: 'monospace' }}>
-                            {formatTimeLeft(auc.endTime)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* BIDDING CONTROLS */}
-                      <div>
-                        {auc.ended ? (
-                          <div style={{ textAlign: 'center', padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px' }}>
-                            <p style={{ margin: 0, fontSize: '13px', fontWeight: 'bold' }}>
-                              {auc.highestBidder ? `Won by ${auc.highestBidder.slice(0, 6)}...${auc.highestBidder.slice(-4)}` : 'Reserve not met / Ended'}
-                            </p>
-                          </div>
-                        ) : expired ? (
-                          <button 
-                            className="btn-primary" 
-                            style={{ width: '100%', justifyContent: 'center' }}
-                            disabled={!walletConnected}
-                            onClick={() => handleEndAuction(auc.contractAddress)}
-                          >
-                            {walletConnected ? 'Finalize & Payout' : 'Connect Wallet to End'}
-                          </button>
-                        ) : (
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <input 
-                              type="number" 
-                              className="form-input" 
-                              placeholder="Bid amount..."
-                              value={bidAmounts[auc.contractAddress] || ''}
-                              onChange={(e) => setBidAmounts({
-                                ...bidAmounts,
-                                [auc.contractAddress]: e.target.value
-                              })}
-                              style={{ width: '60%' }}
-                            />
-                            <button 
-                              className="btn-primary"
-                              style={{ flexGrow: 1, padding: '10px 12px', fontSize: '13px' }}
-                              disabled={!walletConnected}
-                              onClick={() => handlePlaceBid(auc.contractAddress)}
-                            >
-                              Place Bid
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* RIGHT COLUMN: create form, faucets, status */}
-        <aside style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* CONFIG & DEV UTILS */}
-          {walletConnected && (
-            <div className="glass-card" style={{ padding: '20px' }}>
-              <h3 style={{ fontSize: '16px', marginBottom: '12px' }}>Developer Sandbox Faucet</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '14px' }}>
-                Mint test BID tokens to bid in auctions.
-              </p>
-              <button className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={handleMintTokens}>
-                🎁 Mint 500 BID
-              </button>
-            </div>
-          )}
-
-          {/* CREATE AUCTION FORM */}
-          <div className="glass-card" style={{ padding: '20px' }}>
-            <h3 style={{ fontSize: '16px', marginBottom: '16px' }}>List New Item</h3>
-            <form onSubmit={handleCreateAuction} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* Main Campaign Container */}
+      <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Forms, Live Feeds, and Info */}
+        <div className="lg:col-span-1 flex flex-col gap-6">
+          {/* Active Campaign Creator Form */}
+          <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800/80 shadow-xl backdrop-blur-sm">
+            <h2 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">
+              <span className="w-1.5 h-5 bg-gradient-to-b from-emerald-400 to-teal-500 rounded-full"></span>
+              Create Campaign
+            </h2>
+            <form onSubmit={handleCreateCampaign} className="space-y-4">
               <div>
-                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Item Name</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  placeholder="e.g. Rare Cyber Helmet" 
-                  value={itemName}
-                  onChange={(e) => setItemName(e.target.value)}
-                  required
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Goal Amount (TOK)</label>
+                <input
+                  type="number"
+                  value={goal}
+                  onChange={(e) => setGoal(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-200 focus:outline-none focus:border-teal-500 font-mono"
+                  placeholder="e.g. 1000"
                 />
               </div>
-
               <div>
-                <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Metadata / Image URL</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  placeholder="ipfs://... or https://image" 
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Duration (Seconds)</label>
+                <input
+                  type="number"
+                  value={durationSecs}
+                  onChange={(e) => setDurationSecs(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-200 focus:outline-none focus:border-teal-500 font-mono"
+                  placeholder="e.g. 3600"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Description / Metadata URL</label>
+                <input
+                  type="text"
                   value={metadataUri}
                   onChange={(e) => setMetadataUri(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-200 focus:outline-none focus:border-teal-500"
+                  placeholder="ipfs://..."
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Reserve Price</label>
-                  <input 
-                    type="number" 
-                    className="form-input" 
-                    placeholder="100" 
-                    value={reservePrice}
-                    onChange={(e) => setReservePrice(e.target.value)}
-                    required
-                  />
+              {!walletConnected ? (
+                <div className="text-xs text-amber-400 text-center font-medium py-2">
+                  Connect wallet to register campaign
                 </div>
-                <div>
-                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Duration (secs)</label>
-                  <input 
-                    type="number" 
-                    className="form-input" 
-                    placeholder="3600" 
-                    value={durationSecs}
-                    onChange={(e) => setDurationSecs(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <button 
-                type="submit" 
-                className="btn-primary" 
-                style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }}
-                disabled={!walletConnected}
-              >
-                Launch Auction
-              </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={txStatus !== 'idle' && txStatus !== 'success' && txStatus !== 'error'}
+                  className="w-full py-2.5 font-bold uppercase rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 disabled:opacity-50 active:scale-95 transition-all shadow-md"
+                >
+                  Launch Campaign
+                </button>
+              )}
             </form>
           </div>
 
-          {/* REAL-TIME EVENT STREAM */}
-          <div className="glass-card" style={{ padding: '20px', maxHeight: '400px', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '16px' }}>Live Event Feed</h3>
-              <span className="live-dot" style={{ background: '#10b981' }}></span>
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* Activity Feeds */}
+          <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800/80 shadow-xl flex-1 flex flex-col min-h-[300px]">
+            <h2 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">
+              <span className="w-1.5 h-5 bg-gradient-to-b from-teal-400 to-indigo-500 rounded-full"></span>
+              Live Activity Feed
+            </h2>
+            <div className="flex-1 overflow-y-auto space-y-3 max-h-[320px] pr-1 scrollbar-thin">
               {recentEvents.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: '12px', textAlign: 'center', padding: '16px 0' }}>
-                  No events recorded yet.
-                </p>
+                <div className="text-slate-500 text-sm text-center py-10">No recent campaign events.</div>
               ) : (
                 recentEvents.map((evt) => (
-                  <div key={evt.id} style={{ padding: '10px', background: 'rgba(255,255,255,0.02)', borderLeft: '3px solid var(--primary)', borderRadius: '0 8px 8px 0', fontSize: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600', marginBottom: '4px' }}>
-                      <span style={{ color: '#a5b4fc' }}>{evt.type.toUpperCase().replace('_', ' ')}</span>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>Ledger {evt.ledger}</span>
+                  <div key={evt.id} className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/50 flex flex-col gap-1.5 hover:border-slate-700/50 transition-all">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className={`px-2 py-0.5 rounded font-bold uppercase text-[9px] ${
+                        evt.type === 'campaign_created' ? 'bg-emerald-500/20 text-emerald-400' :
+                        evt.type === 'contribution' ? 'bg-sky-500/20 text-sky-400' :
+                        evt.type === 'withdrawn' ? 'bg-amber-500/20 text-amber-400' : 'bg-purple-500/20 text-purple-400'
+                      }`}>
+                        {evt.type}
+                      </span>
+                      <span className="text-slate-500 font-mono">Ledger #{evt.ledger}</span>
                     </div>
-                    {evt.type === 'auction_created' && (
-                      <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '11px' }}>
-                        Seller: {evt.topics[1]?.toString().slice(0, 6)}... created dynamic auction at {evt.topics[2]?.toString().slice(0, 6)}...
-                      </p>
-                    )}
-                    {evt.type === 'new_bid' && (
-                      <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '11px' }}>
-                        Bidder: {evt.topics[1]?.toString().slice(0, 6)}... placed bid of {evt.topics[2]?.toString()} BID
-                      </p>
-                    )}
-                    {evt.type === 'auction_ended' && (
-                      <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '11px' }}>
-                        Auction finalized. Winner: {evt.topics[2]?.toString().slice(0, 6)}... with bid of {evt.value?.toString()} BID
-                      </p>
-                    )}
-                    {evt.type === 'sandbox_connect' && (
-                      <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '11px' }}>
-                        User {evt.topics[1]?.toString().slice(0, 6)}... connected to Sandbox environment.
-                      </p>
+                    <p className="text-sm font-semibold text-slate-200">{evt.value.toString()}</p>
+                    {evt.topics[1] && (
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        By: {formatAddress(evt.topics[1].toString())}
+                      </span>
                     )}
                   </div>
                 ))
               )}
             </div>
           </div>
-        </aside>
-      </div>
+        </div>
 
-      {/* TRANSACTION OVERLAY MODAL */}
-      {txStatus !== 'idle' && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(3, 3, 3, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
-          <div className="glass-card" style={{ padding: '32px', width: '90%', maxWidth: '440px', textAlign: 'center' }}>
-            {txStatus === 'building' && (
-              <>
-                <div className="live-dot" style={{ background: '#3b82f6', width: '24px', height: '24px', margin: '0 auto 16px auto' }}></div>
-                <h3 style={{ fontSize: '20px', marginBottom: '8px' }}>Simulating Host Call</h3>
-                <p style={{ color: 'var(--text-muted)' }}>Simulating transaction parameters and calculating gas resource fees on Stellar network...</p>
-              </>
-            )}
-
-            {txStatus === 'awaiting signature' && (
-              <>
-                <div className="live-dot" style={{ background: '#eab308', width: '24px', height: '24px', margin: '0 auto 16px auto' }}></div>
-                <h3 style={{ fontSize: '20px', marginBottom: '8px' }}>Awaiting Wallet Signature</h3>
-                <p style={{ color: 'var(--text-muted)' }}>Please review and sign the transaction envelope in your wallet extension...</p>
-              </>
-            )}
-
-            {txStatus === 'submitting' && (
-              <>
-                <div className="live-dot" style={{ background: '#a855f7', width: '24px', height: '24px', margin: '0 auto 16px auto' }}></div>
-                <h3 style={{ fontSize: '20px', marginBottom: '8px' }}>Broadcasting to Stellar</h3>
-                <p style={{ color: 'var(--text-muted)' }}>Sending signed transaction envelope to Soroban RPC node...</p>
-              </>
-            )}
-
-            {txStatus === 'confirming' && (
-              <>
-                <div className="live-dot" style={{ background: '#6366f1', width: '24px', height: '24px', margin: '0 auto 16px auto' }}></div>
-                <h3 style={{ fontSize: '20px', marginBottom: '8px' }}>Confirming on Ledger</h3>
-                <p style={{ color: 'var(--text-muted)' }}>Transaction broadcasted. Polling ledger consensus for result...</p>
+        {/* Right Columns: Dashboard and Live Campaign Cards */}
+        <div className="lg:col-span-2 flex flex-col gap-6">
+          {/* Transaction Steps & Error Logs */}
+          {txStatus !== 'idle' && (
+            <div className={`p-4 rounded-2xl border flex flex-col gap-2 ${
+              txStatus === 'error' ? 'bg-red-950/30 border-red-900/50 text-red-300' :
+              txStatus === 'success' ? 'bg-emerald-950/30 border-emerald-900/50 text-emerald-300' :
+              'bg-slate-900/90 border-slate-800 text-slate-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs uppercase font-bold tracking-wider">Transaction State</span>
+                <button onClick={() => setTxStatus('idle')} className="text-xs font-semibold hover:underline">Dismiss</button>
+              </div>
+              <div className="flex items-center gap-3 py-1.5">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${
+                    txStatus === 'error' ? 'bg-red-500' :
+                    txStatus === 'success' ? 'bg-emerald-500' :
+                    'bg-teal-400 animate-ping'
+                  }`}></span>
+                  <span className="font-bold text-sm uppercase tracking-wide">{txStatus}</span>
+                </div>
                 {txHash && (
-                  <p style={{ fontFamily: 'monospace', fontSize: '11px', background: 'rgba(255,255,255,0.03)', padding: '6px', borderRadius: '4px', wordBreak: 'break-all', marginTop: '12px' }}>
-                    Hash: {txHash}
-                  </p>
-                )}
-              </>
-            )}
-
-            {txStatus === 'success' && (
-              <>
-                <div style={{ color: '#10b981', fontSize: '48px', marginBottom: '16px' }}>✓</div>
-                <h3 style={{ fontSize: '20px', marginBottom: '8px', color: '#10b981' }}>Transaction Confirmed!</h3>
-                <p style={{ color: 'var(--text-muted)' }}>Successfully finalized on the Stellar consensus ledger.</p>
-                {txHash && (
-                  <a 
-                    href={`https://stellar.expert/explorer/testnet/tx/${txHash}`} 
-                    target="_blank" 
+                  <a
+                    href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
+                    target="_blank"
                     rel="noreferrer"
-                    style={{ display: 'inline-block', marginTop: '14px', fontSize: '13px', textDecoration: 'underline' }}
+                    className="text-xs text-teal-400 underline font-mono hover:text-teal-300"
                   >
-                    View on Stellar Expert Explorer
+                    View on Stellar.Expert
                   </a>
                 )}
-                <div style={{ marginTop: '20px' }}>
-                  <button className="btn-secondary" style={{ padding: '6px 16px' }} onClick={() => setTxStatus('idle')}>
-                    Close
-                  </button>
-                </div>
-              </>
-            )}
+              </div>
+              {txError && <p className="text-xs font-medium text-red-400/90 bg-red-950/40 p-2 rounded-lg border border-red-900/20">{txError}</p>}
+            </div>
+          )}
 
-            {txStatus === 'error' && (
-              <>
-                <div style={{ color: '#ef4444', fontSize: '48px', marginBottom: '16px' }}>⚠</div>
-                <h3 style={{ fontSize: '20px', marginBottom: '8px', color: '#ef4444' }}>Transaction Failed</h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '13px', wordBreak: 'break-word', background: 'rgba(239, 68, 68, 0.05)', padding: '12px', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px' }}>
-                  {txError || 'An unknown error occurred during execution.'}
-                </p>
-                <div style={{ marginTop: '20px' }}>
-                  <button className="btn-secondary" style={{ padding: '6px 16px' }} onClick={() => setTxStatus('idle')}>
-                    Dismiss
-                  </button>
-                </div>
-              </>
+          {/* Search/Sort and Controls */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/40 p-3 rounded-xl border border-slate-800">
+            <div className="relative w-full sm:max-w-xs">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search campaigns..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500"
+              />
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              {(['all', 'active', 'success', 'failed'] as const).map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setFilterStatus(st)}
+                  className={`flex-1 sm:flex-initial px-3 py-1.5 text-xs font-bold uppercase rounded-lg border tracking-wider transition-all ${
+                    filterStatus === st 
+                      ? 'bg-teal-500/20 border-teal-500 text-teal-400 shadow-md shadow-teal-500/5' 
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Campaigns Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {loadingCampaigns ? (
+              <div className="col-span-full py-20 text-center text-slate-400 font-medium">
+                Fetching campaigns from Soroban ledger...
+              </div>
+            ) : filteredCampaigns.length === 0 ? (
+              <div className="col-span-full py-20 text-center text-slate-500 font-medium bg-slate-900/10 rounded-2xl border border-slate-800 border-dashed">
+                No campaigns match the filter settings.
+              </div>
+            ) : (
+              filteredCampaigns.map((camp) => {
+                const progress = calculateProgress(camp.raised, camp.goal);
+                const isFinished = camp.ended;
+                
+                return (
+                  <div key={camp.contractAddress} className="bg-slate-900/70 rounded-2xl border border-slate-800 overflow-hidden flex flex-col justify-between hover:border-slate-700/80 shadow-lg hover:shadow-xl transition-all">
+                    {/* Top banner / Image simulation */}
+                    <div className="h-32 bg-slate-850 relative flex items-center justify-center overflow-hidden">
+                      {camp.metadataUri.startsWith('http') ? (
+                        <img src={camp.metadataUri} alt="campaign banner" className="w-full h-full object-cover opacity-80" />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/80 to-slate-900/80 flex flex-col items-center justify-center p-4">
+                          <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-widest font-mono">CAMP DESCRIPTION</span>
+                          <p className="text-xs text-center text-slate-300 font-semibold mt-1 truncate max-w-xs">{camp.metadataUri}</p>
+                        </div>
+                      )}
+                      {camp.goalMet && (
+                        <span className="absolute top-3 right-3 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded shadow">
+                          Goal Met 🏆
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Progress Metrics */}
+                    <div className="p-5 flex-1 flex flex-col justify-between gap-5">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-xs text-slate-400">
+                          <span className="font-mono text-[11px]">{formatAddress(camp.contractAddress)}</span>
+                          <span className="font-medium text-slate-300">Creator: {formatAddress(camp.creator)}</span>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between items-end text-sm">
+                            <span className="font-black text-slate-100 font-mono text-base">
+                              {camp.raised.toString()} <span className="text-xs font-semibold text-slate-400">raised</span>
+                            </span>
+                            <span className="text-xs font-bold text-teal-400 font-mono">{progress}%</span>
+                          </div>
+                          <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                            <div className="bg-gradient-to-r from-emerald-400 to-teal-500 h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+                          </div>
+                          <div className="flex justify-between text-[11px] text-slate-400 font-semibold">
+                            <span>Goal: {camp.goal.toString()} TOK</span>
+                            <span>Time Left: {renderTimeLeft(camp.deadline)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Control buttons */}
+                      <div className="space-y-3 pt-2">
+                        {isFinished ? (
+                          <div className="w-full py-2 bg-slate-800/40 rounded-xl text-center text-xs font-bold text-slate-400 uppercase tracking-widest border border-slate-850">
+                            Campaign Claimed/Ended
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {/* Contribute form */}
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                value={contributionAmounts[camp.contractAddress] || ''}
+                                onChange={(e) => setContributionAmounts({
+                                  ...contributionAmounts,
+                                  [camp.contractAddress]: e.target.value
+                                })}
+                                disabled={!walletConnected}
+                                placeholder="TOK amount"
+                                className="w-24 min-w-0 bg-slate-950 border border-slate-800 rounded-lg px-2 text-xs focus:outline-none focus:border-teal-500 font-mono text-slate-200"
+                              />
+                              <button
+                                onClick={() => handleContribute(camp.contractAddress)}
+                                disabled={!walletConnected}
+                                className="flex-1 py-1.5 text-xs font-black uppercase rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 disabled:opacity-40 transition-all"
+                              >
+                                Donate
+                              </button>
+                            </div>
+
+                            {/* Withdraw / Refund actions */}
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleWithdraw(camp)}
+                                disabled={!walletConnected}
+                                className="flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 disabled:opacity-30 transition-all"
+                              >
+                                Withdraw
+                              </button>
+                              <button
+                                onClick={() => handleRefund(camp.contractAddress)}
+                                disabled={!walletConnected}
+                                className="flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 disabled:opacity-30 transition-all"
+                              >
+                                Refund
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
-      )}
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-600">
+        <p className="font-semibold">FundStreamPack Crowdfunding Platform &copy; 2026</p>
+        <p className="mt-1 font-mono text-slate-700">Contract Factory Network: {factoryAddress}</p>
+      </footer>
     </div>
   );
 }
