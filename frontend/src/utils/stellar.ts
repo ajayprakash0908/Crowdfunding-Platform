@@ -9,7 +9,7 @@ import {
   TimeoutInfinite,
   Account,
   Address
-} from 'stellar-sdk';
+} from '@stellar/stellar-sdk';
 import { StellarWalletsKit, WalletNetwork, FreighterModule, xBullModule } from '@creit.tech/stellar-wallets-kit';
 import { signTransaction as signWithFreighter } from '@stellar/freighter-api';
 
@@ -21,7 +21,7 @@ const cleanEnv = (val: string | undefined): string => {
 
 // Network configuration
 export const RPC_URL = cleanEnv(import.meta.env.VITE_STELLAR_RPC_URL) || 'https://soroban-testnet.stellar.org';
-export const NETWORK_PASSPHRASE = cleanEnv(import.meta.env.VITE_STELLAR_NETWORK_PASSPHRASE) || 'Test Stellar Network ; September 2015';
+export const NETWORK_PASSPHRASE = cleanEnv(import.meta.env.VITE_STELLAR_NETWORK_PASSPHRASE) || 'Test SDF Network ; September 2015';
 
 // Contract addresses
 export const FACTORY_ADDRESS = cleanEnv(import.meta.env.VITE_FACTORY_CONTRACT_ADDRESS) || 'CB7SNUNVEH562AGTFPV4O34ITUOO7FRZIJYRCYI3OEHSVY5WFZ4GT7FR';
@@ -141,7 +141,8 @@ export async function submitTransaction(
         address: sourceAddress
       });
       if (signRes.error) {
-        throw new Error(`Freighter API signing error: ${signRes.error}`);
+        const errorMsg = typeof signRes.error === 'object' ? (signRes.error.message || JSON.stringify(signRes.error)) : signRes.error;
+        throw new Error(`Freighter API signing error: ${errorMsg}`);
       }
       signedTxXdr = signRes.signedTxXdr;
     } catch (err: any) {
@@ -180,8 +181,9 @@ export async function submitTransaction(
     throw new Error('Transaction polling timed out');
   } catch (err: any) {
     console.error('Submit transaction failed:', err);
-    onStatusChange('error', undefined, err.message || 'Transaction rejected or failed');
-    throw err;
+    const finalErr = err instanceof Error ? err : new Error(err?.message || JSON.stringify(err) || 'Transaction rejected or failed');
+    onStatusChange('error', undefined, finalErr.message);
+    throw finalErr;
   }
 }
 

@@ -61,7 +61,7 @@ echo "Factory contract initialized successfully!"
 # 6. Save Configuration to Environment Files
 $envContent = @"
 VITE_STELLAR_RPC_URL=https://soroban-testnet.stellar.org
-VITE_STELLAR_NETWORK_PASSPHRASE=Test Stellar Network ; September 2015
+VITE_STELLAR_NETWORK_PASSPHRASE=Test SDF Network ; September 2015
 VITE_FACTORY_CONTRACT_ADDRESS=$factoryAddr
 VITE_TOKEN_CONTRACT_ADDRESS=CDLZFC3SYJYDZT7K67VZ75HPJFCBQ2BBVGTICN2V45PESTCTFBX6JGSZ
 "@

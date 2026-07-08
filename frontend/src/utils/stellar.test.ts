@@ -24,14 +24,14 @@ import {
 
 describe('Stellar Soroban Utils', () => {
   it('should have the correct testnet passphrase configured', () => {
-    expect(NETWORK_PASSPHRASE).toBe('Test Stellar Network ; September 2015');
+    expect(NETWORK_PASSPHRASE).toBe('Test SDF Network ; September 2015');
   });
 
   it('should handle getContractEvents errors gracefully by returning empty array', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(server, 'getEvents').mockRejectedValueOnce(new Error('Network offline'));
 
-    const events = await getContractEvents('CDLZFC3SYJYDZT7K67VZ75HPJFCBQ2BBVGTICN2V45PESTCTFBX6JGSZ');
+    const events = await getContractEvents('CDLZFC3SYJYDZT7K67VZ75HPJFCBQ2BBVGTICN2V45PESTCTFBX6JGSZ', 100);
     
     expect(events).toEqual([]);
     expect(consoleSpy).toHaveBeenCalled();

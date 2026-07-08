@@ -135,4 +135,5 @@ npm run test
 - **Mobile Viewport (375px) Layout**: ![alt text](image.png)
 - **CI/CD green checks pipeline**: ![alt text](image-1.png)
 - **cargo test passes (3+) run**:![alt text](image-2.png)
-- **Loom/YouTube Demo Walkthrough video**: `[Unlisted Video URL Placeholder]`
+- **Loom/YouTube Demo Walkthrough video**: [Watch Demo Video](https://youtu.be/zYRm4shBbBM)
+

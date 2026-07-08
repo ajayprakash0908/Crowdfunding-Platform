@@ -7,7 +7,7 @@ if [ -f .env ]; then
 fi
 
 RPC_URL=${PUBLIC_STELLAR_RPC_URL:-"https://soroban-testnet.stellar.org"}
-NETWORK_PASSPHRASE=${PUBLIC_STELLAR_NETWORK_PASSPHRASE:-"Test Stellar Network ; September 2015"}
+NETWORK_PASSPHRASE=${PUBLIC_STELLAR_NETWORK_PASSPHRASE:-"Test SDF Network ; September 2015"}
 
 echo "-----------------------------------------------------"
 echo "Deploying Real-Time Auction dApp to Soroban Testnet"
