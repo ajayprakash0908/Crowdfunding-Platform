@@ -132,7 +132,7 @@ npm run test
 
 ## 📸 Snapshots & Video Walkthrough
 
-- **Mobile Viewport (375px) Layout**: `[Embedded Mobile Viewport Screenshot Link]`
-- **CI/CD green checks pipeline**: `[GitHub Actions CI/CD Pipeline Screenshot Link]`
-- **cargo test passes (3+) run**: `[cargo test CLI Run Terminal Screenshot Link]`
+- **Mobile Viewport (375px) Layout**: ![alt text](image.png)
+- **CI/CD green checks pipeline**: ![alt text](image-1.png)
+- **cargo test passes (3+) run**:![alt text](image-2.png)
 - **Loom/YouTube Demo Walkthrough video**: `[Unlisted Video URL Placeholder]`
