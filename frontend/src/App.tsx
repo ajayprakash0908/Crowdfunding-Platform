@@ -414,7 +414,7 @@ export default function App() {
     }
     if (campaign.raised < campaign.goal) {
       setTxStatus('error');
-      setTxError('Goal was not met. Campign cannot be withdrawn');
+      setTxError('Goal was not met. Campaign cannot be withdrawn');
       return;
     }
 
@@ -560,13 +560,13 @@ export default function App() {
     const now = BigInt(Math.floor(Date.now() / 1000));
     const diff = deadline - now;
     if (diff <= 0n) {
-      return <span className="text-red-500 font-semibold font-mono">Expired</span>;
+      return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>Expired</span>;
     }
     const secs = Number(diff % 60n);
     const mins = Number((diff / 60n) % 60n);
     const hours = Number(diff / 3600n);
     return (
-      <span className="text-emerald-400 font-semibold font-mono">
+      <span className="text-teal" style={{ fontWeight: 'bold' }}>
         {hours}h {mins}m {secs}s
       </span>
     );
@@ -590,58 +590,41 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased">
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header Navbar */}
-      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-30 px-4 py-3">
-        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl font-black bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent tracking-wider">
-              FUNDSTREAMPACK
-            </span>
-            <span className="px-2 py-0.5 text-xs font-bold uppercase rounded bg-teal-500/20 text-teal-400 border border-teal-500/30">
-              Soroban L3
-            </span>
+      <header className="header">
+        <div className="header-content">
+          <div className="logo-section">
+            <span className="logo-text">FUNDSTREAMPACK</span>
+            <span className="badge-soroban">Soroban L3</span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex-row">
             {walletConnected ? (
-              <div className="flex items-center gap-3">
-                {/* Balance labels */}
-                <div className="hidden sm:flex flex-col text-right">
-                  <span className="text-xs text-slate-400">Balance</span>
-                  <span className="text-sm font-bold text-teal-400 font-mono">
+              <div className="flex-row">
+                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Wallet Balance</span>
+                  <span className="text-teal text-mono" style={{ fontWeight: 'bold', fontSize: '14px' }}>
                     {tokenBalance} TOK | {nativeBalance} XLM
                   </span>
                 </div>
-                <div className="bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-sm font-medium flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${isSandbox ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`}></span>
-                  <span className="font-mono">{formatAddress(userAddress)}</span>
+                <div style={{ background: 'rgba(255,255,255,0.06)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="live-dot" style={{ backgroundColor: isSandbox ? '#f59e0b' : '#10b981' }}></span>
+                  <span className="text-mono" style={{ fontSize: '13px' }}>{formatAddress(userAddress)}</span>
                 </div>
-                <button
-                  onClick={handleMintTokens}
-                  className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 active:scale-95 transition-all"
-                >
+                <button onClick={handleMintTokens} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>
                   Faucet Fnd
                 </button>
-                <button
-                  onClick={handleDisconnect}
-                  className="px-3 py-1.5 text-xs font-bold uppercase rounded-lg bg-red-950/40 hover:bg-red-900/40 text-red-400 border border-red-900/40 transition-all"
-                >
+                <button onClick={handleDisconnect} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '12px', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#fca5a5' }}>
                   Disconnect
                 </button>
               </div>
             ) : (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleConnectWallet('freighter')}
-                  className="px-4 py-2 text-sm font-bold uppercase rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 active:scale-95 transition-all shadow-lg shadow-teal-500/10"
-                >
+              <div className="flex-row">
+                <button onClick={() => handleConnectWallet('freighter')} className="btn-primary" style={{ padding: '8px 16px', fontSize: '13px' }}>
                   Freighter Wallet
                 </button>
-                <button
-                  onClick={() => handleConnectWallet('sandbox')}
-                  className="px-4 py-2 text-sm font-bold uppercase rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 active:scale-95 transition-all"
-                >
+                <button onClick={() => handleConnectWallet('sandbox')} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }}>
                   Sandbox (Mock)
                 </button>
               </div>
@@ -651,56 +634,54 @@ export default function App() {
       </header>
 
       {/* Main Campaign Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <main className="app-container main-layout">
         {/* Left Column: Forms, Live Feeds, and Info */}
-        <div className="lg:col-span-1 flex flex-col gap-6">
+        <div className="sidebar">
           {/* Active Campaign Creator Form */}
-          <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800/80 shadow-xl backdrop-blur-sm">
-            <h2 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">
-              <span className="w-1.5 h-5 bg-gradient-to-b from-emerald-400 to-teal-500 rounded-full"></span>
-              Create Campaign
-            </h2>
-            <form onSubmit={handleCreateCampaign} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Goal Amount (TOK)</label>
+          <div className="glass-card" style={{ padding: '20px' }}>
+            <h2 className="card-title">Create Campaign</h2>
+            <form onSubmit={handleCreateCampaign}>
+              <div className="form-group">
+                <label className="form-label">Goal Amount (TOK)</label>
                 <input
                   type="number"
                   value={goal}
                   onChange={(e) => setGoal(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-200 focus:outline-none focus:border-teal-500 font-mono"
+                  className="form-input text-mono"
                   placeholder="e.g. 1000"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Duration (Seconds)</label>
+              <div className="form-group">
+                <label className="form-label">Duration (Seconds)</label>
                 <input
                   type="number"
                   value={durationSecs}
                   onChange={(e) => setDurationSecs(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-200 focus:outline-none focus:border-teal-500 font-mono"
+                  className="form-input text-mono"
                   placeholder="e.g. 3600"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Description / Metadata URL</label>
+              <div className="form-group">
+                <label className="form-label">Description / Metadata URL</label>
                 <input
                   type="text"
                   value={metadataUri}
                   onChange={(e) => setMetadataUri(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-200 focus:outline-none focus:border-teal-500"
+                  className="form-input"
                   placeholder="ipfs://..."
                 />
               </div>
 
               {!walletConnected ? (
-                <div className="text-xs text-amber-400 text-center font-medium py-2">
+                <div style={{ fontSize: '12px', color: '#f59e0b', textAlign: 'center', padding: '8px 0', fontWeight: 'bold' }}>
                   Connect wallet to register campaign
                 </div>
               ) : (
                 <button
                   type="submit"
                   disabled={txStatus !== 'idle' && txStatus !== 'success' && txStatus !== 'error'}
-                  className="w-full py-2.5 font-bold uppercase rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 disabled:opacity-50 active:scale-95 transition-all shadow-md"
+                  className="btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', padding: '12px' }}
                 >
                   Launch Campaign
                 </button>
@@ -709,30 +690,25 @@ export default function App() {
           </div>
 
           {/* Activity Feeds */}
-          <div className="bg-slate-900/80 rounded-2xl p-5 border border-slate-800/80 shadow-xl flex-1 flex flex-col min-h-[300px]">
-            <h2 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">
-              <span className="w-1.5 h-5 bg-gradient-to-b from-teal-400 to-indigo-500 rounded-full"></span>
-              Live Activity Feed
-            </h2>
-            <div className="flex-1 overflow-y-auto space-y-3 max-h-[320px] pr-1 scrollbar-thin">
+          <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
+            <h2 className="card-title">Live Activity Feed</h2>
+            <div className="event-list">
               {recentEvents.length === 0 ? (
-                <div className="text-slate-500 text-sm text-center py-10">No recent campaign events.</div>
+                <div className="text-muted" style={{ textAlign: 'center', padding: '30px 0', fontSize: '14px' }}>
+                  No recent campaign events.
+                </div>
               ) : (
                 recentEvents.map((evt) => (
-                  <div key={evt.id} className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/50 flex flex-col gap-1.5 hover:border-slate-700/50 transition-all">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className={`px-2 py-0.5 rounded font-bold uppercase text-[9px] ${
-                        evt.type === 'campaign_created' ? 'bg-emerald-500/20 text-emerald-400' :
-                        evt.type === 'contribution' ? 'bg-sky-500/20 text-sky-400' :
-                        evt.type === 'withdrawn' ? 'bg-amber-500/20 text-amber-400' : 'bg-purple-500/20 text-purple-400'
-                      }`}>
+                  <div key={evt.id} className="event-card">
+                    <div className="flex-between" style={{ marginBottom: '6px' }}>
+                      <span className="badge-soroban" style={{ fontSize: '9px' }}>
                         {evt.type}
                       </span>
-                      <span className="text-slate-500 font-mono">Ledger #{evt.ledger}</span>
+                      <span className="text-muted text-mono" style={{ fontSize: '10px' }}>Ledger #{evt.ledger}</span>
                     </div>
-                    <p className="text-sm font-semibold text-slate-200">{evt.value.toString()}</p>
+                    <p style={{ margin: '4px 0', fontSize: '13px', fontWeight: '600' }}>{evt.value.toString()}</p>
                     {evt.topics[1] && (
-                      <span className="text-[11px] text-slate-500 font-mono">
+                      <span className="text-muted text-mono" style={{ fontSize: '10px' }}>
                         By: {formatAddress(evt.topics[1].toString())}
                       </span>
                     )}
@@ -744,63 +720,61 @@ export default function App() {
         </div>
 
         {/* Right Columns: Dashboard and Live Campaign Cards */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
+        <div className="content-section">
           {/* Transaction Steps & Error Logs */}
           {txStatus !== 'idle' && (
-            <div className={`p-4 rounded-2xl border flex flex-col gap-2 ${
-              txStatus === 'error' ? 'bg-red-950/30 border-red-900/50 text-red-300' :
-              txStatus === 'success' ? 'bg-emerald-950/30 border-emerald-900/50 text-emerald-300' :
-              'bg-slate-900/90 border-slate-800 text-slate-200'
+            <div className={`alert-box ${
+              txStatus === 'error' ? 'alert-error' :
+              txStatus === 'success' ? 'alert-success' :
+              'alert-info'
             }`}>
-              <div className="flex items-center justify-between">
-                <span className="text-xs uppercase font-bold tracking-wider">Transaction State</span>
-                <button onClick={() => setTxStatus('idle')} className="text-xs font-semibold hover:underline">Dismiss</button>
+              <div className="flex-between" style={{ marginBottom: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Transaction Monitor</span>
+                <button onClick={() => setTxStatus('idle')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline' }}>Dismiss</button>
               </div>
-              <div className="flex items-center gap-3 py-1.5">
-                <div className="flex items-center gap-2">
-                  <span className={`w-2.5 h-2.5 rounded-full ${
-                    txStatus === 'error' ? 'bg-red-500' :
-                    txStatus === 'success' ? 'bg-emerald-500' :
-                    'bg-teal-400 animate-ping'
-                  }`}></span>
-                  <span className="font-bold text-sm uppercase tracking-wide">{txStatus}</span>
-                </div>
+              <div className="flex-row" style={{ flexWrap: 'wrap' }}>
+                <span className="live-dot" style={{ backgroundColor: txStatus === 'error' ? '#ef4444' : txStatus === 'success' ? '#10b981' : '#6366f1' }}></span>
+                <span style={{ fontWeight: '800', fontSize: '13px', textTransform: 'uppercase' }}>{txStatus}</span>
                 {txHash && (
                   <a
                     href={`https://stellar.expert/explorer/testnet/tx/${txHash}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs text-teal-400 underline font-mono hover:text-teal-300"
+                    className="text-mono"
+                    style={{ fontSize: '12px', color: '#2dd4bf', textDecoration: 'underline' }}
                   >
-                    View on Stellar.Expert
+                    View TX on Explorer
                   </a>
                 )}
               </div>
-              {txError && <p className="text-xs font-medium text-red-400/90 bg-red-950/40 p-2 rounded-lg border border-red-900/20">{txError}</p>}
+              {txError && <p style={{ fontSize: '12px', margin: '8px 0 0 0', padding: '6px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>{txError}</p>}
             </div>
           )}
 
           {/* Search/Sort and Controls */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/40 p-3 rounded-xl border border-slate-800">
-            <div className="relative w-full sm:max-w-xs">
+          <div className="flex-between" style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ flex: '1', minWidth: '200px' }}>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search campaigns..."
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-500"
+                placeholder="Search campaigns by address..."
+                className="form-input"
+                style={{ padding: '8px 12px', fontSize: '13px' }}
               />
             </div>
-            <div className="flex gap-2 w-full sm:w-auto">
+            <div className="flex-row">
               {(['all', 'active', 'success', 'failed'] as const).map((st) => (
                 <button
                   key={st}
                   onClick={() => setFilterStatus(st)}
-                  className={`flex-1 sm:flex-initial px-3 py-1.5 text-xs font-bold uppercase rounded-lg border tracking-wider transition-all ${
-                    filterStatus === st 
-                      ? 'bg-teal-500/20 border-teal-500 text-teal-400 shadow-md shadow-teal-500/5' 
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                  }`}
+                  className="btn-secondary"
+                  style={{ 
+                    padding: '6px 12px', 
+                    fontSize: '11px', 
+                    background: filterStatus === st ? 'rgba(99,102,241,0.15)' : '',
+                    borderColor: filterStatus === st ? 'var(--primary)' : ''
+                  }}
                 >
                   {st}
                 </button>
@@ -809,14 +783,14 @@ export default function App() {
           </div>
 
           {/* Campaigns Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid-container">
             {loadingCampaigns ? (
-              <div className="col-span-full py-20 text-center text-slate-400 font-medium">
-                Fetching campaigns from Soroban ledger...
+              <div className="text-muted shimmer" style={{ gridColumn: '1 / -1', padding: '60px 0', textAlign: 'center', borderRadius: '16px' }}>
+                Fetching active campaigns from Soroban ledger...
               </div>
             ) : filteredCampaigns.length === 0 ? (
-              <div className="col-span-full py-20 text-center text-slate-500 font-medium bg-slate-900/10 rounded-2xl border border-slate-800 border-dashed">
-                No campaigns match the filter settings.
+              <div className="text-muted" style={{ gridColumn: '1 / -1', padding: '60px 0', textAlign: 'center', border: '2px dashed rgba(255,255,255,0.05)', borderRadius: '16px', fontSize: '15px' }}>
+                No crowdfunding campaigns matched current search criteria.
               </div>
             ) : (
               filteredCampaigns.map((camp) => {
@@ -824,60 +798,66 @@ export default function App() {
                 const isFinished = camp.ended;
                 
                 return (
-                  <div key={camp.contractAddress} className="bg-slate-900/70 rounded-2xl border border-slate-800 overflow-hidden flex flex-col justify-between hover:border-slate-700/80 shadow-lg hover:shadow-xl transition-all">
-                    {/* Top banner / Image simulation */}
-                    <div className="h-32 bg-slate-850 relative flex items-center justify-center overflow-hidden">
-                      {camp.metadataUri.startsWith('http') ? (
-                        <img src={camp.metadataUri} alt="campaign banner" className="w-full h-full object-cover opacity-80" />
-                      ) : (
-                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/80 to-slate-900/80 flex flex-col items-center justify-center p-4">
-                          <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-widest font-mono">CAMP DESCRIPTION</span>
-                          <p className="text-xs text-center text-slate-300 font-semibold mt-1 truncate max-w-xs">{camp.metadataUri}</p>
+                  <div key={camp.contractAddress} className="glass-card campaign-card">
+                    {/* Top image banner wrapper */}
+                    <div className="campaign-header-img" style={{ backgroundImage: camp.metadataUri.startsWith('http') ? `url(${camp.metadataUri})` : 'none' }}>
+                      {!camp.metadataUri.startsWith('http') && (
+                        <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '12px' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--primary)' }}>METADATA:</span>
+                          <p style={{ margin: '4px 0', color: '#e4e4e7', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{camp.metadataUri}</p>
                         </div>
                       )}
-                      {camp.goalMet && (
-                        <span className="absolute top-3 right-3 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded shadow">
-                          Goal Met 🏆
-                        </span>
-                      )}
+                      
+                      <div className="campaign-overlay">
+                        <div className="flex-between">
+                          <span className="text-mono" style={{ fontSize: '11px', background: 'rgba(0,0,0,0.5)', padding: '2px 6px', borderRadius: '4px' }}>
+                            {formatAddress(camp.contractAddress)}
+                          </span>
+                          {camp.goalMet && (
+                            <span style={{ fontSize: '10px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#000', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                              GOAL MET 🏆
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Progress Metrics */}
-                    <div className="p-5 flex-1 flex flex-col justify-between gap-5">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-xs text-slate-400">
-                          <span className="font-mono text-[11px]">{formatAddress(camp.contractAddress)}</span>
-                          <span className="font-medium text-slate-300">Creator: {formatAddress(camp.creator)}</span>
+                    {/* Progress Metrics and Actions */}
+                    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', flex: '1', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div className="flex-between" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                          <span>Creator:</span>
+                          <span className="text-mono">{formatAddress(camp.creator)}</span>
                         </div>
 
-                        {/* Progress bar */}
-                        <div className="space-y-1">
-                          <div className="flex justify-between items-end text-sm">
-                            <span className="font-black text-slate-100 font-mono text-base">
-                              {camp.raised.toString()} <span className="text-xs font-semibold text-slate-400">raised</span>
-                            </span>
-                            <span className="text-xs font-bold text-teal-400 font-mono">{progress}%</span>
+                        {/* Progress Bar math */}
+                        <div style={{ marginTop: '4px' }}>
+                          <div className="flex-between" style={{ fontSize: '13px', marginBottom: '4px' }}>
+                            <span style={{ fontWeight: '800', color: '#f4f4f5' }}>{camp.raised.toString()} TOK <span style={{ fontWeight: 'normal', fontSize: '11px', color: 'var(--text-muted)' }}>raised</span></span>
+                            <span className="text-teal text-mono" style={{ fontWeight: 'bold' }}>{progress}%</span>
                           </div>
-                          <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
-                            <div className="bg-gradient-to-r from-emerald-400 to-teal-500 h-full rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+                          <div className="progress-bar-container">
+                            <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
                           </div>
-                          <div className="flex justify-between text-[11px] text-slate-400 font-semibold">
+                          <div className="flex-between" style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
                             <span>Goal: {camp.goal.toString()} TOK</span>
-                            <span>Time Left: {renderTimeLeft(camp.deadline)}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>Ends:</span> {renderTimeLeft(camp.deadline)}
+                            </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Control buttons */}
-                      <div className="space-y-3 pt-2">
+                      {/* Campaign Control Button Form */}
+                      <div>
                         {isFinished ? (
-                          <div className="w-full py-2 bg-slate-800/40 rounded-xl text-center text-xs font-bold text-slate-400 uppercase tracking-widest border border-slate-850">
-                            Campaign Claimed/Ended
+                          <div style={{ textAlign: 'center', padding: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Campaign Concluded
                           </div>
                         ) : (
-                          <div className="space-y-2">
-                            {/* Contribute form */}
-                            <div className="flex gap-2">
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {/* Donate input group */}
+                            <div style={{ display: 'flex', gap: '8px' }}>
                               <input
                                 type="number"
                                 value={contributionAmounts[camp.contractAddress] || ''}
@@ -886,31 +866,35 @@ export default function App() {
                                   [camp.contractAddress]: e.target.value
                                 })}
                                 disabled={!walletConnected}
-                                placeholder="TOK amount"
-                                className="w-24 min-w-0 bg-slate-950 border border-slate-800 rounded-lg px-2 text-xs focus:outline-none focus:border-teal-500 font-mono text-slate-200"
+                                placeholder="Amount"
+                                className="form-input text-mono"
+                                style={{ padding: '6px 10px', fontSize: '12px', flex: '1' }}
                               />
                               <button
                                 onClick={() => handleContribute(camp.contractAddress)}
                                 disabled={!walletConnected}
-                                className="flex-1 py-1.5 text-xs font-black uppercase rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 disabled:opacity-40 transition-all"
+                                className="btn-primary"
+                                style={{ padding: '6px 16px', fontSize: '12px', whiteSpace: 'nowrap' }}
                               >
                                 Donate
                               </button>
                             </div>
 
-                            {/* Withdraw / Refund actions */}
-                            <div className="flex gap-2">
+                            {/* Withdrawal/Refund actions */}
+                            <div style={{ display: 'flex', gap: '8px' }}>
                               <button
                                 onClick={() => handleWithdraw(camp)}
                                 disabled={!walletConnected}
-                                className="flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/40 disabled:opacity-30 transition-all"
+                                className="btn-secondary"
+                                style={{ flex: '1', padding: '6px 8px', fontSize: '11px', justifyContent: 'center' }}
                               >
                                 Withdraw
                               </button>
                               <button
                                 onClick={() => handleRefund(camp.contractAddress)}
                                 disabled={!walletConnected}
-                                className="flex-1 py-1.5 text-[10px] font-black uppercase rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 disabled:opacity-30 transition-all"
+                                className="btn-secondary"
+                                style={{ flex: '1', padding: '6px 8px', fontSize: '11px', justifyContent: 'center', borderColor: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5' }}
                               >
                                 Refund
                               </button>
@@ -928,9 +912,9 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-600">
-        <p className="font-semibold">FundStreamPack Crowdfunding Platform &copy; 2026</p>
-        <p className="mt-1 font-mono text-slate-700">Contract Factory Network: {factoryAddress}</p>
+      <footer style={{ borderTop: '1px solid var(--border-glow)', padding: '16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', background: '#050508', marginTop: '40px' }}>
+        <p style={{ margin: '0', fontWeight: 'bold' }}>FundStreamPack Crowdfunding Platform &copy; 2026</p>
+        <p className="text-mono" style={{ margin: '4px 0 0 0', color: 'rgba(255,255,255,0.2)' }}>Contract Factory: {factoryAddress}</p>
       </footer>
     </div>
   );
