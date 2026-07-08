@@ -33,7 +33,7 @@ export const kit = new StellarWalletsKit({
 
 export interface DecodedEvent {
   id: string;
-  type: string; // 'auction_created' | 'new_bid' | 'auction_ended'
+  type: string; // 'campaign_created' | 'contribution' | 'withdrawn' | 'refunded' | 'unknown'
   contractId: string;
   ledger: string;
   topics: any[];
@@ -47,7 +47,8 @@ export async function getContractEvents(
   startLedger?: number
 ): Promise<DecodedEvent[]> {
   try {
-    // If startLedger is not provided, start from 1000 ledgers back to catch recent history
+    if (!contractAddress) return [];
+    
     let ledgerStart = startLedger;
     if (!ledgerStart) {
       const state = await server.getLatestLedger();
@@ -70,9 +71,12 @@ export async function getContractEvents(
       const decodedValue = scValToNative(e.value);
       
       let type = 'unknown';
-      if (decodedTopics[0] === 'auction_created') type = 'auction_created';
-      else if (decodedTopics[0] === 'new_bid') type = 'new_bid';
-      else if (decodedTopics[0] === 'auction_ended') type = 'auction_ended';
+      const eventTopic = decodedTopics[0]?.toString();
+      
+      if (eventTopic === 'campaign_created') type = 'campaign_created';
+      else if (eventTopic === 'contribution') type = 'contribution';
+      else if (eventTopic === 'withdrawn') type = 'withdrawn';
+      else if (eventTopic === 'refunded') type = 'refunded';
 
       return {
         id: e.id,
@@ -81,7 +85,6 @@ export async function getContractEvents(
         ledger: e.ledger.toString(),
         topics: decodedTopics,
         value: decodedValue,
-        // Mock timestamp based on ledger index for sorting
         timestamp: Date.now() - (100 - Number(e.ledger) % 100) * 5000 
       };
     });
@@ -102,25 +105,22 @@ export async function submitTransaction(
     const account = await server.getAccount(sourceAddress);
     
     let transaction = new TransactionBuilder(account, {
-      fee: '100000', // temporary fee placeholder
+      fee: '100000', 
       networkPassphrase: NETWORK_PASSPHRASE
     })
       .addOperation(txOperation)
       .setTimeout(TimeoutInfinite)
       .build() as Transaction;
 
-    // Simulate transaction to get fees and resource limits
     const sim = await server.simulateTransaction(transaction);
     if (rpc.Api.isSimulationError(sim)) {
       throw new Error(`Simulation failed: ${sim.error}`);
     }
 
-    // Assemble the transaction using simulation resource fees
     transaction = rpc.assembleTransaction(transaction, sim).build() as Transaction;
 
     onStatusChange('awaiting signature');
     
-    // Sign using wallets-kit
     const signedResult = await kit.signTransaction(transaction.toXDR(), {
       networkPassphrase: NETWORK_PASSPHRASE,
       address: sourceAddress
@@ -138,7 +138,6 @@ export async function submitTransaction(
     const txHash = sendResponse.hash;
     onStatusChange('confirming', txHash);
 
-    // Poll transaction status
     let attempts = 0;
     while (attempts < 12) {
       const getResponse = await server.getTransaction(txHash);
@@ -148,7 +147,6 @@ export async function submitTransaction(
       } else if (getResponse.status === 'FAILED') {
         throw new Error('Transaction execution failed on ledger');
       }
-      // Wait 3 seconds
       await new Promise((res) => setTimeout(res, 3000));
       attempts++;
     }
@@ -160,39 +158,37 @@ export async function submitTransaction(
   }
 }
 
-// 1. FACTORY: Create Auction
-export async function createAuctionTx(
+// 1. FACTORY: Create Campaign
+export async function createCampaignTx(
   sourceAddress: string,
-  itemName: string,
-  metadataUri: string,
-  reservePrice: string,
+  goal: string,
   durationSecs: number,
+  metadataUri: string,
   onStatusChange: (status: string, txHash?: string, error?: string) => void
 ): Promise<string> {
   const contract = new Contract(FACTORY_ADDRESS);
   const op = contract.call(
-    'create_auction',
+    'create_campaign',
     nativeToScVal(sourceAddress, { type: 'address' }),
     nativeToScVal(TOKEN_ADDRESS, { type: 'address' }),
-    nativeToScVal(itemName, { type: 'string' }),
-    nativeToScVal(metadataUri, { type: 'string' }),
-    nativeToScVal(BigInt(reservePrice), { type: 'i128' }),
-    nativeToScVal(BigInt(durationSecs), { type: 'u64' })
+    nativeToScVal(BigInt(goal), { type: 'i128' }),
+    nativeToScVal(BigInt(durationSecs), { type: 'u64' }),
+    nativeToScVal(metadataUri, { type: 'string' })
   );
 
   return submitTransaction(sourceAddress, op, onStatusChange);
 }
 
-// 2. AUCTION: Place Bid
-export async function placeBidTx(
+// 2. CAMPAIGN: Contribute
+export async function contributeTx(
   sourceAddress: string,
-  auctionAddress: string,
+  campaignAddress: string,
   amount: string,
   onStatusChange: (status: string, txHash?: string, error?: string) => void
 ): Promise<string> {
-  const contract = new Contract(auctionAddress);
+  const contract = new Contract(campaignAddress);
   const op = contract.call(
-    'bid',
+    'contribute',
     nativeToScVal(sourceAddress, { type: 'address' }),
     nativeToScVal(BigInt(amount), { type: 'i128' })
   );
@@ -200,23 +196,38 @@ export async function placeBidTx(
   return submitTransaction(sourceAddress, op, onStatusChange);
 }
 
-// 3. AUCTION: End Auction
-export async function endAuctionTx(
+// 3. CAMPAIGN: Withdraw
+export async function withdrawTx(
   sourceAddress: string,
-  auctionAddress: string,
+  campaignAddress: string,
   onStatusChange: (status: string, txHash?: string, error?: string) => void
 ): Promise<string> {
-  const contract = new Contract(auctionAddress);
+  const contract = new Contract(campaignAddress);
   const op = contract.call(
-    'end_auction',
+    'withdraw',
     nativeToScVal(sourceAddress, { type: 'address' })
   );
 
   return submitTransaction(sourceAddress, op, onStatusChange);
 }
 
-// 4. FACTORY: Get all auctions
-export async function listAuctions(): Promise<string[]> {
+// 4. CAMPAIGN: Refund
+export async function refundTx(
+  sourceAddress: string,
+  campaignAddress: string,
+  onStatusChange: (status: string, txHash?: string, error?: string) => void
+): Promise<string> {
+  const contract = new Contract(campaignAddress);
+  const op = contract.call(
+    'refund',
+    nativeToScVal(sourceAddress, { type: 'address' })
+  );
+
+  return submitTransaction(sourceAddress, op, onStatusChange);
+}
+
+// 5. FACTORY: List campaigns
+export async function listCampaigns(): Promise<string[]> {
   if (!FACTORY_ADDRESS) return [];
   try {
     const contract = new Contract(FACTORY_ADDRESS);
@@ -227,7 +238,7 @@ export async function listAuctions(): Promise<string[]> {
         networkPassphrase: NETWORK_PASSPHRASE
       }
     )
-      .addOperation(contract.call('list_auctions'))
+      .addOperation(contract.call('list_campaigns'))
       .setTimeout(TimeoutInfinite)
       .build();
 
@@ -240,28 +251,27 @@ export async function listAuctions(): Promise<string[]> {
     const addresses = scValToNative(value) as any[];
     return addresses.map((addr) => addr.toString());
   } catch (err) {
-    console.error('Failed to list auctions:', err);
+    console.error('Failed to list campaigns:', err);
     return [];
   }
 }
 
-// 5. AUCTION: Get status
-export interface AuctionStatus {
-  seller: string;
+// 6. CAMPAIGN: Get status
+export interface CampaignStatus {
+  raised: bigint;
+  goal: bigint;
+  deadline: bigint;
+  goalMet: boolean; // Map goal_met
+  creator: string;
   token: string;
-  itemName: string;
-  itemMetadataUri: string;
-  reservePrice: bigint;
-  endTime: bigint;
-  highestBid: bigint;
-  highestBidder: string | null;
   ended: boolean;
+  metadataUri: string;
   contractAddress: string;
 }
 
-export async function getAuctionStatus(auctionAddress: string): Promise<AuctionStatus | null> {
+export async function getCampaignStatus(campaignAddress: string): Promise<CampaignStatus | null> {
   try {
-    const contract = new Contract(auctionAddress);
+    const contract = new Contract(campaignAddress);
     const transaction = new TransactionBuilder(
       new Account('GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF', '-1'),
       {
@@ -282,24 +292,23 @@ export async function getAuctionStatus(auctionAddress: string): Promise<AuctionS
     const status = scValToNative(scVal) as any;
 
     return {
-      seller: status.seller.toString(),
+      raised: BigInt(status.raised.toString()),
+      goal: BigInt(status.goal.toString()),
+      deadline: BigInt(status.deadline.toString()),
+      goalMet: status.goal_met,
+      creator: status.creator.toString(),
       token: status.token.toString(),
-      itemName: status.item_name.toString(),
-      itemMetadataUri: status.item_metadata_uri.toString(),
-      reservePrice: BigInt(status.reserve_price.toString()),
-      endTime: BigInt(status.end_time.toString()),
-      highestBid: BigInt(status.highest_bid.toString()),
-      highestBidder: status.highest_bidder ? status.highest_bidder.toString() : null,
       ended: status.ended,
-      contractAddress: auctionAddress
+      metadataUri: status.metadata_uri.toString(),
+      contractAddress: campaignAddress
     };
   } catch (err) {
-    console.error(`Failed to query status for auction ${auctionAddress}:`, err);
+    console.error(`Failed to query status for campaign ${campaignAddress}:`, err);
     return null;
   }
 }
 
-// 6. TOKEN: Get Balance
+// 7. TOKEN: Get Balance
 export async function getTokenBalance(tokenAddress: string, userAddress: string): Promise<bigint> {
   try {
     const contract = new Contract(tokenAddress);
@@ -327,7 +336,7 @@ export async function getTokenBalance(tokenAddress: string, userAddress: string)
   }
 }
 
-// 7. TOKEN: Mint Test Tokens
+// 8. TOKEN: Mint Test Tokens
 export async function mintTokensTx(
   sourceAddress: string,
   amount: string,
@@ -342,3 +351,28 @@ export async function mintTokensTx(
 
   return submitTransaction(sourceAddress, op, onStatusChange);
 }
+
+// 9. Crowdfunding Utilities for UI Logic & Testing
+export function calculateProgress(raised: bigint, goal: bigint): number {
+  if (goal <= 0n) return 0;
+  const progress = Number((raised * 100n) / goal);
+  return progress > 100 ? 100 : progress;
+}
+
+export function validateCampaignInputs(
+  goal: string, 
+  durationSecs: string, 
+  metadataUri: string
+): { valid: boolean; error?: string } {
+  if (!goal || isNaN(Number(goal)) || Number(goal) <= 0) {
+    return { valid: false, error: 'Goal must be a positive number' };
+  }
+  if (!durationSecs || isNaN(Number(durationSecs)) || Number(durationSecs) <= 0) {
+    return { valid: false, error: 'Duration must be a positive number of seconds' };
+  }
+  if (!metadataUri || !metadataUri.startsWith('ipfs://') && !metadataUri.startsWith('http://') && !metadataUri.startsWith('https://')) {
+    return { valid: false, error: 'Metadata URI must be a valid IPFS or HTTP link' };
+  }
+  return { valid: true };
+}
+
