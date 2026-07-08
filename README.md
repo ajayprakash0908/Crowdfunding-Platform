@@ -1,5 +1,7 @@
 # FundStreamPack - Crowdfunding Platform dApp (Stellar Soroban Testnet)
 
+[![CI](https://github.com/ajayprakash0908/Crowdfunding-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/ajayprakash0908/Crowdfunding-Platform/actions/workflows/ci.yml)
+
 FundStreamPack is a production-grade decentralized crowdfunding platform built on the Stellar Soroban smart contract network. It allows creators to launch campaigns with custom token goals and deadlines, and enables donors to contribute funds securely. Contributions are held in contract escrows and are either claimed by the creator (if the goal is met) or fully refunded to the contributors (if the goal fails by the deadline).
 
 **GitHub Repository Link**: [ajayprakash0908/Crowdfunding-Platform](https://github.com/ajayprakash0908/Crowdfunding-Platform)
