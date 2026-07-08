@@ -3,4 +3,3 @@
 /stellar-cli.tar.gz
 .env
 **/test_snapshots/
-Cargo.lock
