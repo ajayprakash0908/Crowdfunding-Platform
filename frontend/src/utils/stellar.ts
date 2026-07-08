@@ -127,6 +127,7 @@ export async function submitTransaction(
     onStatusChange('awaiting signature');
     
     const signedResult = await kit.signTransaction(transaction.toXDR(), {
+      network: WalletNetwork.TESTNET,
       networkPassphrase: NETWORK_PASSPHRASE,
       address: sourceAddress
     });
