@@ -316,8 +316,10 @@ export default function App() {
           }
         );
         await loadRealCampaigns();
-      } catch (err) {
+      } catch (err: any) {
         console.error('Create campaign transaction failed:', err);
+        setTxStatus('error');
+        setTxError(err.message || 'Create campaign failed');
       }
     }
   };
@@ -396,8 +398,10 @@ export default function App() {
         setContributionAmounts({ ...contributionAmounts, [campaignAddress]: '' });
         await refreshBalances();
         await loadRealCampaigns();
-      } catch (err) {
+      } catch (err: any) {
         console.error('Contribution failed:', err);
+        setTxStatus('error');
+        setTxError(err.message || 'Contribution failed');
       }
     }
   };
@@ -464,8 +468,10 @@ export default function App() {
         );
         await refreshBalances();
         await loadRealCampaigns();
-      } catch (err) {
+      } catch (err: any) {
         console.error('Withdrawal failed:', err);
+        setTxStatus('error');
+        setTxError(err.message || 'Withdrawal failed');
       }
     }
   };
@@ -543,8 +549,10 @@ export default function App() {
         );
         await refreshBalances();
         await loadRealCampaigns();
-      } catch (err) {
+      } catch (err: any) {
         console.error('Refund transaction failed:', err);
+        setTxStatus('error');
+        setTxError(err.message || 'Refund failed');
       }
     }
   };
