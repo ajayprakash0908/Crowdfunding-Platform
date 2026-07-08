@@ -11,6 +11,7 @@ import {
   Address
 } from 'stellar-sdk';
 import { StellarWalletsKit, WalletNetwork, FreighterModule, xBullModule } from '@creit.tech/stellar-wallets-kit';
+import { signTransaction as signWithFreighter } from '@stellar/freighter-api';
 
 // Helper to clean environment variables (removing Carriage Returns \r from Windows files)
 const cleanEnv = (val: string | undefined): string => {
@@ -132,14 +133,29 @@ export async function submitTransaction(
 
     onStatusChange('awaiting signature');
     
-    const signedResult = await kit.signTransaction(transaction.toXDR(), {
-      networkPassphrase: NETWORK_PASSPHRASE,
-      address: sourceAddress
-    });
+    let signedTxXdr: string;
+    try {
+      console.log('Attempting transaction sign with official Freighter API...');
+      const signRes = await signWithFreighter(transaction.toXDR(), {
+        networkPassphrase: NETWORK_PASSPHRASE,
+        address: sourceAddress
+      });
+      if (signRes.error) {
+        throw new Error(`Freighter API signing error: ${signRes.error}`);
+      }
+      signedTxXdr = signRes.signedTxXdr;
+    } catch (err: any) {
+      console.warn('Direct Freighter signing failed, falling back to wallet kit:', err);
+      const signedResult = await kit.signTransaction(transaction.toXDR(), {
+        networkPassphrase: NETWORK_PASSPHRASE,
+        address: sourceAddress
+      });
+      signedTxXdr = signedResult.signedTxXdr;
+    }
 
     onStatusChange('submitting');
     
-    const signedTx = TransactionBuilder.fromXDR(signedResult.signedTxXdr, NETWORK_PASSPHRASE) as Transaction;
+    const signedTx = TransactionBuilder.fromXDR(signedTxXdr, NETWORK_PASSPHRASE) as Transaction;
     const sendResponse = await server.sendTransaction(signedTx);
     
     if (sendResponse.status === 'ERROR') {
