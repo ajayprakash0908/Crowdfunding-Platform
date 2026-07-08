@@ -1,79 +1,123 @@
-# Real-Time Auction dApp (Level 3 – Orange Belt)
+# FundStreamPack - Crowdfunding Platform dApp (Stellar Soroban Testnet)
 
-A production-grade, end-to-end decentralized Auction application built on the **Stellar Soroban Testnet** with Rust smart contracts and a React/Vite/TypeScript front-end interface.
-
-## 🏗️ Architecture Overview
-
-The dApp comprises a Factory contract that dynamically spawns isolated, stateful Auction contracts, and a front-end client executing transactions via Freighter Wallet and Soroban RPC.
-
-```mermaid
-graph TD
-    User([User Freighter/Sandbox]) -->|Interact| FE[React Web Client]
-    FE -->|Read/Simulate| RPC[Soroban RPC Node]
-    FE -->|Submit Transaction| Ledger[Stellar Testnet Consensus]
-    
-    subgraph Soroban Smart Contracts
-        Factory[Factory Contract] -->|Dynamic Deploy v2| Auction[Auction Instance]
-        Auction -->|Escrow & Refunds| Token[Bid Token Contract]
-    end
-    
-    Ledger -->|Execute Calls| Factory
-    Ledger -->|Execute Calls| Auction
-```
-
-### Smart Contract Specifications
-1. **Dynamic Factory (`contracts/factory`)**:
-   - `create_auction(seller, token, item_name, item_metadata_uri, reserve_price, duration_secs) -> Address`: Instantiates a new auction contract with the stored Wasm hash, sets up initial metadata, and emits an `auction_created` event.
-   - `list_auctions() -> Vec<Address>`: Returns all active/completed auction addresses.
-2. **Dynamic Auction (`contracts/auction`)**:
-   - `bid(bidder, amount)`: Places a bid. Authenticates the bidder via `require_auth()`. Rejects if the auction has expired, if the bid is below the reserve, or if it doesn't exceed the current highest bid. Immediately refunds the previous highest bidder.
-   - **Anti-Sniping**: Automatically extends the auction deadline by 60 seconds if a bid is placed within the last 60 seconds of the auction.
-   - `end_auction(caller)`: Finals and closes the auction. Automatically routes the highest bid from escrow to the seller, or refunds the bidder if the reserve price was not met.
+FundStreamPack is a production-grade decentralized crowdfunding platform built on the Stellar Soroban smart contract network. It allows creators to launch campaigns with custom token goals and deadlines, and enables donors to contribute funds securely. Contributions are held in contract escrows and are either claimed by the creator (if the goal is met) or fully refunded to the contributors (if the goal fails by the deadline).
 
 ---
 
-## 🚀 Key Frontend Features
+## 📐 Architecture Overview
 
-1. **Stellar Wallets Kit**: Integrates `@creit.tech/stellar-wallets-kit` to request secure transaction signatures from the Freighter extension.
-2. **Transaction Lifecycle Overlay**: Displays real-time updates through each transaction stage:
-   `Building/Simulating` ➔ `Awaiting Signature` ➔ `Broadcasting` ➔ `Confirming on Ledger` ➔ `Success/Error`.
-3. **Live Event Ledger**: Polls RPC nodes to decode event topics (`auction_created`, `new_bid`, `auction_ended`) and display updates.
-4. **Sandbox Simulation Fallback**: Offers a fully functional mock wallet sandbox mode so users can instantly test the app lifecycle without Freighter installed.
-5. **Aesthetics**: Glassmorphic dark styling, responsive metrics dashboard, and real-time countdown progress bars.
+The dApp comprises two custom contracts cooperating with a standard Stellar SAC (Stellar Asset Contract) token instance:
+
+```
+                  ┌────────────────────────────────────────┐
+                  │            Factory Contract            │
+                  │   Deploys campaign instances dynamically│
+                  └───────────────────┬────────────────────┘
+                                      │
+                                      │ (Instantiates)
+                                      ▼
+┌──────────────┐  (Calls transfer)  ┌──────────────────────┐
+│  Donor/User  ├───────────────────>│  Campaign Contract   │
+│   Account    │                    │ (Holds funds escrow) │
+└──────────────┘                    └─────────┬────────────┘
+       ▲                                      │
+       │           (Transfer Back)            │
+       └──────────────────────────────────────┘
+                  (Refund / Creator Claim)
+```
+
+1. **Factory Contract**: Deploys CAMPAIGN contract WASM bytecodes dynamically via deterministic salts. It registers campaign contract addresses in persistent memory and emits `campaign_created` events.
+2. **Campaign Contract**: Receives contributions, tracks donor balances, handles creator claims (`withdraw`) when goals are met, and triggers donor-initiated `refund` distributions when campaigns expire without meeting targets.
+3. **Token Contract**: Stellar native XLM wrapper (`CDLZFC3SYJYDZT7K67VZ75HPJFCBQ2BBVGTICN2V45PESTCTFBX6JGSZ`) or custom test tokens representing contribution capital.
 
 ---
 
-## 🛠️ Quick Start
+## 🚀 Deployed Addresses & Transaction Signatures
 
-### Prerequisites
-- [Rust & Cargo](https://rustup.rs/) (Stable 1.82+ or 1.81.0)
-- [Target wasm32v1-none](https://developers.stellar.org/docs/smart-contracts/getting-started/setup)
-- [Node.js](https://nodejs.org/) v18+ & npm
+- **Factory Contract Address**: `CB7SNUNVEH562AGTFPV4O34ITUOO7FRZIJYRCYI3OEHSVY5WFZ4GT7FR`
+- **Sample Campaign Address**: `CCAMP_MOCK_SOLAR_POWER_KITS` (Simulated Sandbox instance) / Dynamic dynamic testnet address generated on first user campaign creation.
+- **Wrapped XLM Token Address**: `CDLZFC3SYJYDZT7K67VZ75HPJFCBQ2BBVGTICN2V45PESTCTFBX6JGSZ`
 
-### 1. Compile Smart Contracts
-Enable WebAssembly compilation and build target WASM files:
+### Verifiable Testnet Transaction Signatures
+- **Campaign WASM Upload Hash Tx**: [c5f3855a6e6a168b9be4cbae032a07297b66e18217b7f4a5018afb4445c32219](https://stellar.expert/explorer/testnet/tx/c5f3855a6e6a168b9be4cbae032a07297b66e18217b7f4a5018afb4445c32219)
+- **Factory WASM Upload Hash Tx**: [1f654a4d9b92d00eda053755cadb2aa3a8d701b3f2679047710a27cca62153b2](https://stellar.expert/explorer/testnet/tx/1f654a4d9b92d00eda053755cadb2aa3a8d701b3f2679047710a27cca62153b2)
+- **Factory Deployment Tx**: [f92a487ccef0819a6aca4330c12efdb62ab566b22edda03888108d8f119b81f4](https://stellar.expert/explorer/testnet/tx/f92a487ccef0819a6aca4330c12efdb62ab566b22edda03888108d8f119b81f4)
+- **Factory Contract Init Tx**: [5c33421b8e04ffeced1e6f72c529b581416318fab9f51678f12a698cc4c5505e](https://stellar.expert/explorer/testnet/tx/5c33421b8e04ffeced1e6f72c529b581416318fab9f51678f12a698cc4c5505e)
+
+---
+
+## 🛠️ Local Installation & Development Setup
+
+### 1. Compile & Build Smart Contracts
+Before building, ensure you have the `wasm32-unknown-unknown` Rust target installed:
 ```bash
-# Build WASM binaries
-cargo build --target wasm32v1-none --release
+rustup target add wasm32-unknown-unknown
 ```
 
-### 2. Run Rust Unit Tests
-Disable incremental compilation to prevent file conflicts:
+To compile the bytecode for deployment:
+1. Modify `crate-type` settings in `contracts/campaign/Cargo.toml` and `contracts/factory/Cargo.toml` to:
+   ```toml
+   [lib]
+   crate-type = ["cdylib", "rlib"]
+   ```
+2. Execute the cargo build sequence:
+   ```bash
+   cargo build --target wasm32-unknown-unknown --release
+   ```
+
+### 2. Execute Contract Tests
+To run the Cargo tests, ensure `crate-type` is set back to `["rlib"]` (to avoid MinGW compiler linking issues on Windows) and execute the tests using the command below:
 ```bash
-# Set incremental flag and run contract tests
-$env:CARGO_INCREMENTAL=0; cargo test
+$env:RUST_MIN_STACK=16777216; $env:CARGO_INCREMENTAL=0; cargo test
+```
+*Note: We set `RUST_MIN_STACK` to bypass recursive macro access violations on Windows systems.*
+
+#### Sample Cargo Test Output
+```
+running 5 tests
+test test::test_contribution_after_deadline_fails - should panic ... ok
+test test::test_withdrawal_before_goal_met_fails - should panic ... ok
+test test::test_successful_contribution ... ok
+test test::test_successful_refund ... ok
+test test::test_successful_withdrawal ... ok
+
+test result: ok. 5 passed; 0 failed
 ```
 
-### 3. Launch Frontend Web App
-Install dependencies and spin up the Vite development server:
+---
+
+### 3. Deploy to Testnet (Manual/Script Fallback)
+Our deployments use the portable `stellar.exe` binary. Run the PowerShell deployment script:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1
+```
+Or execute manual contract commands sequentially:
+```bash
+# Fund deployer
+curl -s "https://friendbot.stellar.org/?addr=<DEPLOYER_ADDR>"
+
+# Install Campaign bytecode
+stellar contract install --wasm target/wasm32-unknown-unknown/release/campaign_contract.wasm --source deployer --network testnet
+
+# Deploy Factory
+stellar contract deploy --wasm target/wasm32-unknown-unknown/release/factory_contract.wasm --source deployer --network testnet
+
+# Initialize Factory
+stellar contract invoke --id <FACTORY_ADDRESS> --source deployer --network testnet -- init --wasm_hash <CAMPAIGN_WASM_HASH>
+```
+
+---
+
+### 4. Running the React Client locally
+Navigate to the `frontend` folder and run the Vite dev server:
 ```bash
 cd frontend
-npm install --legacy-peer-deps
+npm install
 npm run dev
 ```
+Open **`http://localhost:5174/`** in your browser. Connect Freighter Wallet (configured on Testnet) or toggle the Sandbox mode to test with instant mock simulations!
 
-### 4. Run Frontend Unit Tests
-Execute the Vitest test suites:
+To run frontend Vitest suites:
 ```bash
 cd frontend
 npm run test
@@ -81,11 +125,9 @@ npm run test
 
 ---
 
-## 🔗 Environment Variables (.env)
-Configure your client settings in `frontend/.env`:
-```env
-VITE_STELLAR_RPC_URL=https://soroban-testnet.stellar.org
-VITE_STELLAR_NETWORK_PASSPHRASE=Test Stellar Network ; September 2015
-VITE_FACTORY_CONTRACT_ADDRESS=CAUC... # Your deployed Factory address
-VITE_TOKEN_CONTRACT_ADDRESS=CDLZFC3SYJYDZT7K67VZ75HPJFCBQ2BBVGTICN2V45PESTCTFBX6JGSZ # Wrapped XLM
-```
+## 📸 Snapshots & Video Walkthrough
+
+- **Mobile Viewport (375px) Layout**: `[Embedded Mobile Viewport Screenshot Link]`
+- **CI/CD green checks pipeline**: `[GitHub Actions CI/CD Pipeline Screenshot Link]`
+- **cargo test passes (3+) run**: `[cargo test CLI Run Terminal Screenshot Link]`
+- **Loom/YouTube Demo Walkthrough video**: `[Unlisted Video URL Placeholder]`
