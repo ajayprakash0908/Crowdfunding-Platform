@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "contracts/factory",
-    "contracts/auction",
+    "contracts/campaign",
 ]
 
 [profile.release]
