@@ -4,7 +4,7 @@ use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
 mod campaign_wasm {
     soroban_sdk::contractimport!(
-        file = "../../target/wasm32v1-none/release/campaign_contract.wasm"
+        file = "../../target/wasm32-unknown-unknown/release/campaign_contract.wasm"
     );
 }
 
