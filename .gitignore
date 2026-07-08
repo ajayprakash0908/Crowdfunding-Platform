@@ -1,5 +1,6 @@
 /target/
 /stellar.exe
 /stellar-cli.tar.gz
-/.env
+.env
+**/test_snapshots/
 Cargo.lock
